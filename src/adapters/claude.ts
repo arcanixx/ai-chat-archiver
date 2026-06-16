@@ -191,7 +191,7 @@ function findArtifactCards(assistantBody: Element): Element[] {
       scope = scope.parentElement;
     } catch (e: any) {
       logger.warn("Error in artifact card search iteration", { iteration: i, error: e.message });
-      scope = scope.parentElement;
+      scope = scope?.parentElement ?? null;
     }
   }
   
