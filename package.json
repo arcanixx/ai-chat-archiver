@@ -1,0 +1,26 @@
+{
+  "name": "ai-chat-archiver",
+  "version": "1.1.0",
+  "description": "Save AI conversations to Markdown, HTML, or JSON",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "turndown": "^7.2.0"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.0.0-beta.23",
+    "@types/chrome": "^0.0.268",
+    "@types/node": "^20.14.2",
+    "@types/turndown": "^5.0.4",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.12",
+    "vitest": "^1.6.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "jsdom": "^24.0.0"
+  }
+}

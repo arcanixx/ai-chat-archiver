@@ -1,0 +1,7 @@
+{
+  "extName": { "message": "AI Chat Archiver" },
+  "extDescription": { "message": "Save AI conversations to Markdown, HTML, or JSON with attachments and artifacts support." },
+  "saveButton": { "message": "Save this chat" },
+  "saveSelection": { "message": "Save selection as snippet" },
+  "optionsTitle": { "message": "AI Chat Archiver Settings" }
+}

@@ -1,0 +1,32 @@
+# Node.js & npm
+node_modules/
+npm-debug.log*
+
+# Vite build output
+/dist
+/ai-chat-archiver-extension
+
+# Environment files
+.env
+.env.*
+
+# VSCode settings
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Generated files
+*.tsbuildinfo
+
+# Temporary files
+tmp/
+docs/html_examples/
+
+# Chromium extension artifacts
+public/icons/*.png

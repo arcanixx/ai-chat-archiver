@@ -1,0 +1,7 @@
+{
+  "extName": { "message": "AI Chat Archiver" },
+  "extDescription": { "message": "Zapisuj konwersacje AI do plików Markdown, HTML lub JSON, wspierając załączniki i artefakty." },
+  "saveButton": { "message": "Zapisz ten czat" },
+  "saveSelection": { "message": "Zapisz zaznaczenie" },
+  "optionsTitle": { "message": "Ustawienia AI Chat Archiver" }
+}
