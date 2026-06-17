@@ -39,9 +39,14 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export function isUiChrome(el: Element): boolean {
   const dataId = el.getAttribute("data-test-id") || el.getAttribute("data-testid") || "";
   if (/copy-button|action-bar|more-menu|thumb-(up|down)|expandable-section-toggle|prompt-copy/.test(dataId)) return true;
-  const role = el.getAttribute("role");
-  if (role === "button" || el.tagName === "BUTTON") return true;
   if (el.matches?.("mat-icon, gem-icon, .cdk-visually-hidden")) return true;
+  // Only skip buttons that are small/icon-only (no substantial text), not content-bearing ones
+  if (el.tagName === "BUTTON" || el.getAttribute("role") === "button") {
+    const text = (el.textContent || "").trim();
+    if (text.length <= 2) return true; // icon-only buttons
+    if (/^(edit|copy|share|delete|remove|close|\s*)$/i.test(text)) return true;
+    return false; // keep buttons with meaningful content
+  }
   return false;
 }
 

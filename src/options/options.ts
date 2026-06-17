@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const templateEl = document.getElementById("filenameTemplate") as HTMLInputElement;
   const btnEl = document.getElementById("showFloatingButton") as HTMLInputElement;
   const titlePrefixEl = document.getElementById("titlePrefixIgnore") as HTMLInputElement;
+  const languageEl = document.getElementById("language") as HTMLSelectElement;
   const fmtJsonEl = document.getElementById("fmt-json") as HTMLInputElement;
   const fmtMdEl = document.getElementById("fmt-md") as HTMLInputElement;
   const fmtHtmlEl = document.getElementById("fmt-html") as HTMLInputElement;
@@ -50,6 +51,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   templateEl.value = settings.filenameTemplate;
   btnEl.checked = settings.showFloatingButton;
   titlePrefixEl.value = settings.titlePrefixIgnore ?? "";
+  languageEl.value = settings.language ?? "en";
   batchConcurrencyEl.value = String(settings.batchConcurrency ?? 2);
 
   fmtJsonEl.checked = settings.enabledFormats.includes("json");
@@ -283,6 +285,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
     });
 
+    document.getElementById("clearHistory")?.addEventListener("click", async () => {
+      if (!confirm("This will remove the deduplication cache. Previously saved conversations may be re-downloaded. Continue?")) return;
+      await chrome.storage.local.remove("history_v1");
+      const status = document.getElementById("status");
+      if (status) {
+        status.textContent = "Save history cleared.";
+        setTimeout(() => (status.textContent = ""), 2000);
+      }
+    });
+
     document.getElementById("save")?.addEventListener("click", async () => {
     const enabledFormats = [] as ExportFormat[];
     if (fmtJsonEl.checked) enabledFormats.push("json");
@@ -306,6 +318,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       filenameTemplate: templateEl.value,
       showFloatingButton: btnEl.checked,
       titlePrefixIgnore: titlePrefixEl.value.trim(),
+      language: languageEl.value as "en" | "pl",
       enabledFormats,
       perProvider,
       batchConcurrency: parseInt(batchConcurrencyEl.value) || 2,

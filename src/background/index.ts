@@ -105,7 +105,7 @@ async function saveConversationAttachments(conv: Conversation, settings: any): P
       }
     } catch (err: any) {
       logger.error(`Failed to save attachment ${att.name}`, err);
-      conv.warnings.push(`Failed to save attachment: ${att.name} - ${err.message}`);
+      conv.warnings.push(`Failed to save attachment: ${att.name} — ${err.message}${att.url ? ` (URL: ${att.url})` : ""}`);
     }
   }
 }

@@ -10,6 +10,7 @@ export { buildConversation, handleSaveConversation, saveSelection };
 
 const STORAGE_KEY = "ai_archiver_tracked_chats";
 const FLOAT_BTN_ID = "ai-archiver-float-btn";
+let saveInProgress = false;
 
 function extractChatId(url: string, provider: string): string | undefined {
   const u = new URL(url);
@@ -180,6 +181,11 @@ function detectLangFromText(text: string): string | undefined {
 }
 
 async function saveSelection() {
+  if (saveInProgress) {
+    logger.debug("Save already in progress, skipping");
+    return;
+  }
+  saveInProgress = true;
   const startTime = Date.now();
   logger.debug("Starting save selection");
 
@@ -192,15 +198,17 @@ async function saveSelection() {
     }
 
     const text = selection.toString();
+    const hasMarkdown = /^#{1,6}\s|\n#{1,6}\s|```|^[\-*]\s|^\d+\.\s|^\|.*\|$|\[.+\]\(.+\)/.test(text);
     const looksLikeCode =
-      /^[ \t]+/.test(text) || /[{};]/.test(text) ||
-      text.includes("function") || text.includes("const ");
+      !hasMarkdown && (/^[ \t]+/.test(text) || /[{};]/.test(text) ||
+      text.includes("function") || text.includes("const "));
     const lang = looksLikeCode ? detectLangFromText(text) : undefined;
 
     logger.debug("Selection detected", { 
       length: text.length, 
       looksLikeCode, 
-      lang 
+      lang,
+      hasMarkdown
     });
 
     // Auto-generate filename instead of prompting (prompt can be blocked)
@@ -253,6 +261,8 @@ async function saveSelection() {
       stack: err.stack 
     });
     toast(`Error: ${err.message}`, "err");
+  } finally {
+    saveInProgress = false;
   }
 }
 
@@ -287,6 +297,11 @@ function sendRuntimeMessage(msg: RuntimeMessage): Promise<any> {
 // ─── Save conversation ─────────────────────────────────────────────────────────
 
 async function handleSaveConversation() {
+  if (saveInProgress) {
+    logger.debug("Save already in progress, skipping");
+    return;
+  }
+  saveInProgress = true;
   const startTime = Date.now();
   logger.debug("Starting save conversation", { url: location.href });
 
@@ -323,7 +338,7 @@ async function handleSaveConversation() {
             chatId: conversation.chatId,
             title: conversation.title 
           });
-          toast("Archive is already up to date");
+          toast("Already saved — no new messages");
           return;
         }
         logger.debug("Deduplication check passed", { chatId: conversation.chatId });
@@ -363,6 +378,8 @@ async function handleSaveConversation() {
       stack: err.stack 
     });
     toast(`Error: ${err.message}`, "err");
+  } finally {
+    saveInProgress = false;
   }
 }
 

@@ -23,60 +23,62 @@ export const claudeAdapter: ProviderAdapter = {
   async expandAll(doc) {
     logger.debug("Starting expandAll for Claude", { url: doc.location?.href || "unknown" });
     
-    try {
-      await expandUntilStable(doc, [
-        'button[aria-label*="Thinking" i]',
-        'button[aria-label*="Reasoning" i]',
-        'button[aria-label*="Show more" i]',
-        'button[aria-expanded="false"][data-state]',
-      ]);
-      logger.debug("Initial expansion completed");
-    } catch (e: any) {
-      logger.error("Initial expansion failed", { error: e.message });
-      throw e;
-    }
-    
-    const artifactSelectors = [
-      'button[aria-label*="Open in side panel" i]',
-      'button[aria-label*="View source" i]',
-      'button[aria-label*="Expand" i]',
+    await expandUntilStable(doc, [
+      // Thinking/reasoning blocks
+      'button[aria-label*="Thinking" i]',
+      'button[aria-label*="Reasoning" i]',
+      'button[aria-label*="Thought" i]',
       'button[aria-label*="Show" i]',
-      '[data-testid*="artifact"] button',
-      '[class*="artifact"] button',
-      'div[class*="artifact"] > button',
-      'div[class*="artifact"] button:first-child',
-    ];
+      'button[aria-label*="Expand" i]',
+      'button[aria-label*="Collapse" i]',
+      'button[aria-expanded="false"][data-state]',
+      'button[aria-expanded="false"]',
+      // Details/summary
+      'details summary',
+      'summary[aria-expanded="false"]',
+      // Any collapsed section with clickable parent
+      '[role="button"][aria-expanded="false"]',
+    ]);
     
-    let clickCount = 0;
-    for (const sel of artifactSelectors) {
-      try {
-        const buttons = doc.querySelectorAll<HTMLElement>(sel);
-        buttons.forEach((b) => {
-          try {
-            if (!b.closest('nav')) {
-              if (b.innerText?.match(/created.*file/i)) {
-                logger.debug("Clicking artifact creation button", { text: b.innerText.slice(0, 50) });
-                b.click();
-                clickCount++;
-              } else if (b.innerText?.match(/(expand|show)/i)) {
-                logger.debug("Clicking expand/show button", { text: b.innerText.slice(0, 50) });
-                b.click();
-                clickCount++;
-              }
-            }
-          } catch (e: any) {
-            logger.warn("Failed to click button", { selector: sel, error: e.message });
-          }
-        });
-      } catch (e: any) {
-        logger.error("Error processing artifact selector", { selector: sel, error: e.message });
+    // Second pass: click any expandable sections by text content
+    const allButtons = doc.querySelectorAll<HTMLElement>('button, [role="button"]');
+    for (const btn of allButtons) {
+      if (btn.closest('nav, header, [role="navigation"]')) continue;
+      const text = (btn.textContent || '').toLowerCase().trim();
+      const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+      const expanded = btn.getAttribute('aria-expanded');
+      if (expanded === 'false' || text.includes('thinking') || text.includes('reasoning') || text.includes('thought') || label.includes('think') || label.includes('reason') || label.includes('expand') || label.includes('show')) {
+        try {
+          btn.click();
+        } catch {}
       }
     }
     
-    logger.debug("Artifact expansion completed", { clickCount });
+    // Open all <details> elements  
+    doc.querySelectorAll('details:not([open])').forEach((d) => ((d as HTMLDetailsElement).open = true));
     
-    await new Promise((r) => setTimeout(r, 1500));
-    logger.debug("Waiting period completed");
+    // Expand artifact content sections
+    const artifactExpanders = doc.querySelectorAll<HTMLElement>([
+      'button[aria-label*="artifact" i]',
+      'button[aria-label*="code" i]',
+      'button[aria-label*="Open in" i]',
+      'button[aria-label*="View source" i]',
+      '[class*="artifact"] button',
+      '[data-testid*="artifact"] button',
+      'div[class*="artifact"] button',
+    ].join(','));
+    artifactExpanders.forEach((b) => {
+      try {
+        const text = (b.textContent || '').toLowerCase();
+        const label = (b.getAttribute('aria-label') || '').toLowerCase();
+        if ((text.includes('expand') || text.includes('show') || label.includes('expand') || label.includes('show')) && !b.closest('nav')) {
+          b.click();
+        }
+      } catch {}
+    });
+    
+    await new Promise((r) => setTimeout(r, 2000));
+    logger.debug("expandAll completed");
   },
   
   extract(doc) {

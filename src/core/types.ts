@@ -85,6 +85,7 @@ export interface Settings {
   bulkProvider: ProviderId | null;
   titlePrefixIgnore: string;
   bulkDefaultFormat: ExportFormat;
+  language: "en" | "pl";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -113,6 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bulkProvider: null,
   titlePrefixIgnore: "",
   bulkDefaultFormat: "md",
+  language: "en",
 };
 
 export type RuntimeMessage =

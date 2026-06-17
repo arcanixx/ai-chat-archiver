@@ -67,6 +67,21 @@
     <div class="hint">Comma-separated list of prefixes to ignore when deduplicating. E.g. "[OLD] Prism" and "Prism" are treated as the same chat.</div>
   </div>
 
+  <div class="form-group">
+    <label>Export language:</label>
+    <select id="language">
+      <option value="en">English</option>
+      <option value="pl">Polski</option>
+    </select>
+    <div class="hint">Language for role labels and metadata in exported files.</div>
+  </div>
+
+  <div class="form-group">
+    <label>Save history:</label>
+    <button id="clearHistory" style="background:#dc2626;">Clear save history</button>
+    <div class="hint">Removes deduplication cache. Previously saved conversations may be re-downloaded.</div>
+  </div>
+
   <h2>Export formats</h2>
   <div class="form-group">
     <label class="checkbox-label"><input type="checkbox" id="fmt-md"> Markdown (.md)</label>

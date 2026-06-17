@@ -1,19 +1,48 @@
 import type { RuntimeMessage } from "../core/types";
+
+let toastQueue: HTMLElement[] = [];
+let toastContainer: HTMLElement | null = null;
+
+function getToastContainer() {
+  if (!toastContainer) {
+    toastContainer = document.createElement("div");
+    toastContainer.className = "ai-archiver-toast-container";
+    toastContainer.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:2147483647;display:flex;flex-direction:column;gap:8px;pointer-events:none;";
+    document.body.appendChild(toastContainer);
+  }
+  return toastContainer;
+}
+
 export function toast(text: string, kind: "ok" | "err" = "ok") {
-  const existing = document.querySelector(".ai-archiver-toast");
-  if (existing) existing.remove();
+  const container = getToastContainer();
   
   const t = document.createElement("div");
   t.className = `ai-archiver-toast ai-archiver-toast-${kind}`;
   t.textContent = text;
-  document.body.appendChild(t);
+  t.style.cssText = "padding:12px 28px;border-radius:8px;color:white;font-size:14px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,0.25);opacity:0;transform:translateY(-10px);transition:opacity 0.3s,transform 0.3s;text-align:center;max-width:400px;word-break:break-word;";
+  if (kind === "ok") t.style.background = "#16a34a";
+  else t.style.background = "#dc2626";
   
-  requestAnimationFrame(() => t.classList.add("show"));
+  container.appendChild(t);
+  toastQueue.push(t);
+  
+  requestAnimationFrame(() => {
+    t.style.opacity = "1";
+    t.style.transform = "translateY(0)";
+  });
   
   setTimeout(() => {
-    t.classList.remove("show");
-    setTimeout(() => t.remove(), 300);
-  }, 4000);
+    t.style.opacity = "0";
+    t.style.transform = "translateY(-10px)";
+    setTimeout(() => {
+      t.remove();
+      toastQueue = toastQueue.filter(item => item !== t);
+      if (toastQueue.length === 0 && toastContainer) {
+        toastContainer.remove();
+        toastContainer = null;
+      }
+    }, 300);
+  }, 6000);
 }
 
 export async function injectFloatingButton(onSave: () => void, onSaveSelection: () => void) {
@@ -57,13 +86,26 @@ export async function injectFloatingButton(onSave: () => void, onSaveSelection: 
       btn.style.top = `${floatingButtonPosition.y}px`;
     }
   } catch {}
+
+  // Reposition button when viewport changes (e.g. DevTools opens/closes on right)
+  let repositionTimer: ReturnType<typeof setTimeout> | null = null;
+  const ro = new ResizeObserver(() => {
+    if (repositionTimer) clearTimeout(repositionTimer);
+    repositionTimer = setTimeout(() => {
+      const rect = btn.getBoundingClientRect();
+      const maxRight = window.innerWidth - 20;
+      if (rect.left > maxRight) {
+        btn.style.left = "auto";
+        btn.style.right = "20px";
+        btn.style.top = `${rect.top}px`;
+        chrome.storage.sync.set({ floatingButtonPosition: { x: window.innerWidth - 56, y: rect.top } });
+      }
+    }, 200);
+  });
+  ro.observe(document.body);
   
   const style = document.createElement("style");
   style.textContent = `
-    .ai-archiver-toast { position: fixed; bottom: 20px; left: 20px; padding: 10px 20px; border-radius: 4px; color: white; opacity: 0; transition: opacity 0.3s; z-index: 10000; }
-    .ai-archiver-toast-ok { background: #4caf50; }
-    .ai-archiver-toast-err { background: #f44336; }
-    .ai-archiver-toast.show { opacity: 1; }
     #ai-archiver-float-btn:hover { background: rgba(50,50,50,0.95) !important; transform: scale(1.05); }
     #ai-archiver-float-btn.loading { opacity: 0.6; pointer-events: none; }
   `;
