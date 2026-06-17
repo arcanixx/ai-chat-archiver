@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Machine Learning Pipeline Optimization — Grok</title></head>
+<body>
+
+<div class="message-row" data-message-author-role="user">
+  <div class="prose">
+    <p>How do I optimize my ML training pipeline for better GPU utilization?</p>
+  </div>
+  <time datetime="2026-06-15T13:00:00Z">1:00 PM</time>
+</div>
+
+<div class="message-row" data-message-author-role="assistant">
+  <div class="prose">
+    <p>Here are key strategies for GPU optimization in ML pipelines:</p>
+    <h2>Data Loading</h2>
+    <ul>
+      <li>Use <code>DataLoader</code> with <code>num_workers &gt; 0</code></li>
+      <li>Prefetch with <code>prefetch_factor=2</code></li>
+      <li>Use <code>pin_memory=True</code> for faster GPU transfer</li>
+    </ul>
+    <pre><code class="language-python">from torch.utils.data import DataLoader
+
+train_loader = DataLoader(
+    dataset,
+    batch_size=128,
+    num_workers=8,
+    prefetch_factor=2,
+    pin_memory=True,
+    persistent_workers=True
+)</code></pre>
+    <h2>Mixed Precision</h2>
+    <pre><code class="language-python">from torch.cuda.amp import autocast, GradScaler
+
+scaler = GradScaler()
+for data in train_loader:
+    optimizer.zero_grad()
+    with autocast():
+        output = model(data)
+        loss = criterion(output, targets)
+
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()</code></pre>
+    <h2>Gradient Accumulation</h2>
+    <pre><code class="language-python">accumulation_steps = 4
+for i, data in enumerate(train_loader):
+    output = model(data)
+    loss = criterion(output, targets) / accumulation_steps
+    loss.backward()
+
+    if (i + 1) % accumulation_steps == 0:
+        optimizer.step()
+        optimizer.zero_grad()</code></pre>
+  </div>
+  <time datetime="2026-06-15T13:00:15Z">1:00 PM</time>
+</div>
+
+<div class="message-row user">
+  <div class="markdown">
+    <p>What batch size should I use for a 24GB GPU?</p>
+  </div>
+  <time datetime="2026-06-15T13:05:00Z">1:05 PM</time>
+</div>
+
+<div class="message-row" data-message-author-role="assistant">
+  <div class="markdown">
+    <p>For a 24GB GPU, here are recommended batch sizes by model type:</p>
+    <table>
+      <thead><tr><th>Model Type</th><th>Batch Size</th><th>Resolution/Size</th></tr></thead>
+      <tbody>
+        <tr><td>ResNet-50</td><td>256</td><td>224x224</td></tr>
+        <tr><td>ViT-Base</td><td>128</td><td>224x224</td></tr>
+        <tr><td>LLaMA-7B (fine-tune)</td><td>4 (with LoRA)</td><td>2048 tokens</td></tr>
+        <tr><td>Stable Diffusion</td><td>8</td><td>512x512</td></tr>
+      </tbody>
+    </table>
+    <p>Start with these values and monitor GPU memory with <code>nvidia-smi</code> or <code>torch.cuda.memory_summary()</code>.</p>
+  </div>
+  <time datetime="2026-06-15T13:05:15Z">1:05 PM</time>
+</div>
+
+<button aria-label="Show more" aria-expanded="false" style="display:none">Show more</button>
+</body>
+</html>

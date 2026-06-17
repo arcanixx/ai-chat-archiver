@@ -3,5 +3,16 @@
   "extDescription": { "message": "Zapisuj konwersacje AI do plików Markdown, HTML lub JSON, wspierając załączniki i artefakty." },
   "saveButton": { "message": "Zapisz ten czat" },
   "saveSelection": { "message": "Zapisz zaznaczenie" },
-  "optionsTitle": { "message": "Ustawienia AI Chat Archiver" }
+  "optionsTitle": { "message": "Ustawienia AI Chat Archiver" },
+  "bulkExportTitle": { "message": "Eksport Masowy" },
+  "bulkStartExport": { "message": "Rozpocznij Eksport Masowy" },
+  "bulkStatusTitle": { "message": "Status" },
+  "bulkStatusReady": { "message": "Gotowy do eksportu" },
+  "bulkActionsTitle": { "message": "Akcje" },
+  "bulkCancel": { "message": "Anuluj" },
+  "bulkClose": { "message": "Zamknij" },
+  "bulkBack": { "message": "Powrót do Głównej" },
+  "formatMarkdown": { "message": "Markdown (.md)" },
+  "formatText": { "message": "Tekst Jawny (.txt)" },
+  "formatPDF": { "message": "PDF (.pdf)" }
 }

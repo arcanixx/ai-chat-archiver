@@ -1,13 +1,15 @@
 import { expandUntilStable, nodeToParts, readTimestamp, type ProviderAdapter } from "./base";
+import { extractAttachmentsFromDocument } from "../core/attachments";
 import type { Message } from "../core/types";
 
 export const grokAdapter: ProviderAdapter = {
   id: "grok",
   match: (u) => u.hostname.endsWith("grok.com") || u.hostname.endsWith("x.ai"),
+  isFullyExpandedView: (u) => u.pathname.startsWith("/share/"),
   
   getTitle(doc) {
     const t = doc.title.replace(/\s*[-–|]\s*Grok.*$/i, "").trim();
-    return t || "Grok conversation";
+    return t || "Untitled conversation";
   },
   
   async expandAll(doc) {
@@ -19,7 +21,6 @@ export const grokAdapter: ProviderAdapter = {
   
   extract(doc) {
     const messages: Message[] = [];
-    // Wersja wstępna: adaptacja pod przyszłe zmiany w DOM. Grok DOM jest zmienny.
     const turns = Array.from(doc.querySelectorAll(".message-row, [data-message-author-role]"));
     
     for (const el of turns) {
@@ -36,5 +37,11 @@ export const grokAdapter: ProviderAdapter = {
     }
     
     return messages;
+  },
+
+  supportsBulk: true,
+
+  extractAttachments(doc) {
+    return extractAttachmentsFromDocument(doc);
   },
 };

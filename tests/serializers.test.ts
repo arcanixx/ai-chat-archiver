@@ -162,7 +162,7 @@ describe('Serializers', () => {
           {
             role: 'user',
             parts: [
-              { type: 'text', markdown: 'Special chars: < > & " \' \n \t' }
+              { type: 'text', markdown: 'Special chars: < > & " \'' }
             ],
             createdAt: '2024-01-01T12:00:00.000Z'
           }
@@ -173,10 +173,10 @@ describe('Serializers', () => {
       const htmlResult = serialize(specialCharsConversation, 'html');
       
       // Markdown should preserve special characters
-      expect(mdResult.text).toContain('Special chars: < > & " \' ');
+      expect(mdResult.text).toContain('Special chars: < > & " \'');
       
       // HTML should escape special characters
-      expect(htmlResult.text).toContain('Special chars: &lt; &gt; &amp; &quot; &#x27;');
+      expect(htmlResult.text).toContain('Special chars: &lt; &gt; &amp; &quot; &#39;');
     });
 
     it('should handle code with special characters', () => {

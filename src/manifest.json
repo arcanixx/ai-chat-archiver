@@ -90,7 +90,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "icons/*.png"
+        "icons/*.png",
+        "src/bulk/bulk-popup.html"
       ],
       "matches": [
         "<all_urls>"

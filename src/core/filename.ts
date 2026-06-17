@@ -2,6 +2,7 @@ import type { Conversation } from "./types";
 
 const RESERVED_RE = /[<>:"/\\|?*\x00-\x1f]/g;
 
+/** Normalize a string to be filesystem-safe. Removes diacritics, truncates to `max` chars. */
 export function slugify(input: string, max = 80): string {
   if (!input) return "untitled";
   const norm = input
@@ -21,6 +22,7 @@ function pad(n: number, w = 2) {
   return String(n).padStart(w, "0");
 }
 
+/** Build a map of template tokens from a Conversation object. */
 function tokens(c: Conversation) {
   const d = new Date(c.capturedAt);
   const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -34,9 +36,11 @@ function tokens(c: Conversation) {
     time,
     datetime,
     model: c.providerModel ? slugify(c.providerModel, 40) : "model",
+    chatId: c.chatId ?? "",
   };
 }
 
+/** Build a full file path from a template string, conversation data, extension, and folder. */
 export function buildFilename(template: string, conv: Conversation, ext: string, folder: string): string {
   const t = tokens(conv) as Record<string, string>;
   let path = template.replace(/\{(\w+)\}/g, (_, k) => t[k] ?? "");

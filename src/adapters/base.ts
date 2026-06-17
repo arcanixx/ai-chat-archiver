@@ -1,7 +1,29 @@
 import { logger } from "../core/logger";
-import type { Message, Part } from "../core/types";
+import type { Attachment, BulkConversationItem, Message, Part } from "../core/types";
 
-export interface ProviderAdapter {
+export interface BulkAdapter {
+  getOrgId?(doc: Document): string | null;
+  getAuthToken?(doc: Document): string | null;
+  supportsBulk?: boolean;
+  fetchList?(authContext: string, limit: number, offset: number): Promise<{
+    items: BulkConversationItem[];
+    nextOffset?: number;
+    total?: number;
+  }>;
+  fetchDetail?(authContext: string, conversationId: string): Promise<any>;
+  parseBulkData?(data: any, options?: any): Promise<{
+    title: string;
+    url: string;
+    chatId?: string;
+    providerModel?: string;
+    messages: Message[];
+    attachments?: Attachment[];
+    warnings?: string[];
+  }>;
+  extractAttachments?(doc: Document): Attachment[];
+}
+
+export interface ProviderAdapter extends Partial<BulkAdapter> {
   id: string;
   match(url: URL): boolean;
   isFullyExpandedView?(url: URL): boolean;
@@ -267,7 +289,6 @@ export function nodeToParts(root: Element): Part[] {
     return finalParts;
   } catch (e: any) {
     logger.error("Error in nodeToParts", { error: e.message, stack: e.stack });
-    // Return whatever we have so far
     flush();
     return mergeAdjacentText(parts);
   }
@@ -321,4 +342,51 @@ function htmlTableToMd(tbl: HTMLTableElement): string {
     logger.error("Failed to convert table to Markdown", { error: e.message });
     return "[Error: Could not convert table]";
   }
+}
+
+export function extractDomConversationList(doc: Document, limit = 30, offset = 0) {
+  const items: BulkConversationItem[] = [];
+  const seen = new Set<string>();
+  const origin = doc.location?.origin || new URL(doc.URL || "https://example.com").origin;
+  const candidateSelectors = [
+    "[data-conversation-id]",
+    "[data-chat-id]",
+    "[data-id]",
+    ".conversation-item",
+    ".chat-item",
+    ".history-item",
+    "[class*='conversation-item']",
+    "[class*='chat-item']",
+    "a[href*='/chat/']",
+    "a[href*='/c/']",
+    "a[href*='/app/']",
+  ];
+
+  for (const selector of candidateSelectors) {
+    try {
+      for (const el of Array.from(doc.querySelectorAll(selector))) {
+        const id = el.getAttribute("data-conversation-id") || el.getAttribute("data-chat-id") || el.getAttribute("data-id") || "";
+        const anchor = el.tagName === "A" ? (el as HTMLAnchorElement) : (el.querySelector("a[href]") as HTMLAnchorElement | null);
+        const href = anchor?.href || "";
+        const url = href || (id ? new URL(`/chat/${encodeURIComponent(id)}`, origin).href : "");
+        const resolvedId = id || href.split("/").filter(Boolean).pop() || "";
+        const titleEl = el.querySelector(".title, .name, h1, h2, h3, [class*='title'], [class*='name']");
+        const title = titleEl?.textContent?.trim() || el.textContent?.trim() || "Untitled";
+        if (!resolvedId || seen.has(resolvedId)) continue;
+        seen.add(resolvedId);
+        items.push({
+          id: resolvedId,
+          title: title.slice(0, 200),
+          url,
+          createdAt: el.getAttribute("data-created-at") || el.getAttribute("data-time") || new Date().toISOString(),
+          updatedAt: el.getAttribute("data-updated-at") || undefined,
+        });
+        if (items.length >= limit + offset) return items.slice(offset, offset + limit);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return items.slice(offset, offset + limit);
 }

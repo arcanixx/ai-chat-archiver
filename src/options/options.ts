@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fmtJsonEl = document.getElementById("fmt-json") as HTMLInputElement;
   const fmtMdEl = document.getElementById("fmt-md") as HTMLInputElement;
   const fmtHtmlEl = document.getElementById("fmt-html") as HTMLInputElement;
+  const fmtPdfEl = document.getElementById("fmt-pdf") as HTMLInputElement;
   const provClaudeEl = document.getElementById("prov-claude") as HTMLInputElement;
   const provChatgptEl = document.getElementById("prov-chatgpt") as HTMLInputElement;
   const provGeminiEl = document.getElementById("prov-gemini") as HTMLInputElement;
@@ -24,6 +25,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const provKimiEl = document.getElementById("prov-kimi") as HTMLInputElement;
   const provGrokEl = document.getElementById("prov-grok") as HTMLInputElement;
   const provCopilotEl = document.getElementById("prov-copilot") as HTMLInputElement;
+  
+  // Bulk export settings
+  const bulkSaveAttachmentsEl = document.getElementById("bulkSaveAttachments") as HTMLInputElement;
+  const bulkDownloadAttachmentsEl = document.getElementById("bulkDownloadAttachments") as HTMLInputElement;
+  const bulkDefaultFormatEl = document.getElementById("bulkDefaultFormat") as HTMLSelectElement;
 
   const batchUrlsEl = document.getElementById("batchUrls") as HTMLTextAreaElement;
   const batchConcurrencyEl = document.getElementById("batchConcurrency") as HTMLInputElement;
@@ -49,6 +55,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   fmtJsonEl.checked = settings.enabledFormats.includes("json");
   fmtMdEl.checked = settings.enabledFormats.includes("md");
   fmtHtmlEl.checked = settings.enabledFormats.includes("html");
+  fmtPdfEl.checked = settings.enabledFormats.includes("pdf");
+  
+  // Bulk export settings
+  bulkSaveAttachmentsEl.checked = settings.saveAttachments ?? true;
+  bulkDownloadAttachmentsEl.checked = settings.downloadAttachments ?? false;
+  bulkDefaultFormatEl.value = settings.bulkDefaultFormat || "md";
 
   provClaudeEl.checked = settings.perProvider?.claude ?? true;
   provChatgptEl.checked = settings.perProvider?.chatgpt ?? true;
@@ -143,12 +155,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   }) {
     const div = document.createElement("div");
     div.className = `batch-result-item ${job.status === "completed" ? "success" : "error"}`;
-    div.innerHTML = `
-      <span class="status-dot"></span>
-      <span class="url" title="${job.url}">${job.url}</span>
-      <span class="msg-count">${job.messageCount ? job.messageCount + " msgs" : ""}</span>
-      ${job.error ? `<span class="msg-count" style="color:#dc2626">${job.error}</span>` : ""}
-    `;
+    const urlSpan = document.createElement("span");
+    urlSpan.className = "url";
+    urlSpan.title = job.url;
+    urlSpan.textContent = job.url;
+    const statusDot = document.createElement("span");
+    statusDot.className = "status-dot";
+    const msgSpan = document.createElement("span");
+    msgSpan.className = "msg-count";
+    msgSpan.textContent = job.messageCount ? `${job.messageCount} msgs` : "";
+    div.appendChild(statusDot);
+    div.appendChild(urlSpan);
+    div.appendChild(msgSpan);
+    if (job.error) {
+      const errSpan = document.createElement("span");
+      errSpan.className = "msg-count";
+      errSpan.style.color = "#dc2626";
+      errSpan.textContent = job.error;
+      div.appendChild(errSpan);
+    }
     batchResultsEl.insertBefore(div, batchResultsEl.firstChild);
   }
 
@@ -263,6 +288,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (fmtJsonEl.checked) enabledFormats.push("json");
     if (fmtMdEl.checked) enabledFormats.push("md");
     if (fmtHtmlEl.checked) enabledFormats.push("html");
+    if (fmtPdfEl.checked) enabledFormats.push("pdf");
 
     const perProvider = {
       claude: provClaudeEl.checked,
@@ -283,6 +309,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       enabledFormats,
       perProvider,
       batchConcurrency: parseInt(batchConcurrencyEl.value) || 2,
+      saveAttachments: bulkSaveAttachmentsEl.checked,
+      downloadAttachments: bulkDownloadAttachmentsEl.checked,
+      bulkDefaultFormat: bulkDefaultFormatEl.value as "md" | "txt" | "pdf",
     } as any);
 
     const status = document.getElementById("status");

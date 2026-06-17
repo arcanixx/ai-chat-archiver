@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Bulk Export - AI Chat Archiver</title>
+  <style>
+    body { 
+      font-family: system-ui, sans-serif; 
+      width: 320px; 
+      margin: 0; 
+      padding: 16px; 
+      background: #fff; 
+      color: #111; 
+    }
+    h1 { 
+      font-size: 16px; 
+      margin: 0 0 16px 0; 
+    }
+    .section {
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #374151;
+    }
+    button { 
+      width: 100%; 
+      padding: 8px; 
+      margin-bottom: 8px; 
+      cursor: pointer; 
+      background: #4f46e5; 
+      color: #fff; 
+      border: none; 
+      border-radius: 4px; 
+    }
+    button:hover { 
+      background: #4338ca; 
+    }
+    .secondary { 
+      background: #e5e7eb; 
+      color: #374151; 
+    }
+    .secondary:hover { 
+      background: #d1d5db; 
+    }
+    .danger {
+      background: #ef4444;
+      color: #fff;
+    }
+    .danger:hover {
+      background: #dc2626;
+    }
+    select {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      background: #fff;
+    }
+    .status {
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .status.info {
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #93c5fd;
+    }
+    .status.success {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+    .progress {
+      width: 100%;
+      height: 4px;
+      background: #e5e7eb;
+      border-radius: 2px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #4f46e5;
+      transition: width 0.3s ease;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="title">Bulk Export</h1>
+  
+  <div class="section">
+    <div class="section-title" data-i18n="bulkExportTitle">Export Options</div>
+    <select id="format-select">
+      <option value="md" data-i18n="formatMarkdown">Markdown (.md)</option>
+      <option value="txt" data-i18n="formatText">Plain Text (.txt)</option>
+      <option value="pdf" data-i18n="formatPDF">PDF (.pdf)</option>
+    </select>
+    <button id="btn-start-bulk" data-i18n="bulkStartExport">Start Bulk Export</button>
+  </div>
+
+  <div class="section">
+    <div class="section-title" data-i18n="bulkStatusTitle">Status</div>
+    <div id="status-container" class="hidden">
+      <div id="status-message" class="status info"></div>
+      <div class="progress">
+        <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+      </div>
+    </div>
+    <div id="status-empty" data-i18n="bulkStatusReady">Ready to export</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title" data-i18n="bulkActionsTitle">Actions</div>
+    <button id="btn-cancel" class="secondary hidden" data-i18n="bulkCancel">Cancel</button>
+    <button id="btn-close" class="secondary hidden" data-i18n="bulkClose">Close</button>
+    <button id="btn-back" class="secondary" data-i18n="bulkBack">Back to Main</button>
+  </div>
+
+  <script type="module" src="./bulk-popup.ts"></script>
+</body>
+</html>

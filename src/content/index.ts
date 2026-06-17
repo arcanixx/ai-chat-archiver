@@ -1,8 +1,10 @@
 import { adapterFor } from "../adapters";
+import { extractDomConversationList } from "../adapters/base";
 import { toast, injectFloatingButton } from "./ui";
 import { repairFences } from "../core/fence";
 import { logger } from "../core/logger";
-import type { Conversation, ExportFormat, RuntimeMessage } from "../core/types";
+import { appendAttachmentNotes, extractAttachmentsFromDocument, mergeAttachments } from "../core/attachments";
+import type { Attachment, Conversation, ExportFormat, RuntimeMessage } from "../core/types";
 
 export { buildConversation, handleSaveConversation, saveSelection };
 
@@ -23,22 +25,11 @@ function extractChatId(url: string, provider: string): string | undefined {
   }
 }
 
-function detectAttachments(doc: Document) {
-  const attachments: Array<{ name: string; url: string; mime?: string }> = [];
-  doc.querySelectorAll('img[src*="attachment"], img[src*="upload"], img[data-type="attachment"]').forEach((img) => {
-    const src = (img as HTMLImageElement).src;
-    if (src && !src.startsWith("data:")) {
-      attachments.push({ name: img.getAttribute("alt") || "attachment", url: src, mime: "image/*" });
-    }
-  });
-  doc.querySelectorAll('a[href*="file"], a[download], [data-testid*="attachment"]').forEach((a) => {
-    const href = (a as HTMLAnchorElement).href;
-    const name = a.textContent?.trim() || a.getAttribute("download") || "file";
-    if (href && !attachments.find((att) => att.url === href)) {
-      attachments.push({ name, url: href });
-    }
-  });
-  return attachments;
+function detectAttachments(doc: Document, adapter?: { extractAttachments?: (doc: Document) => Attachment[] }) {
+  return mergeAttachments(
+    extractAttachmentsFromDocument(doc),
+    adapter?.extractAttachments?.(doc)
+  );
 }
 
 async function buildConversation(): Promise<Conversation> {
@@ -85,7 +76,7 @@ async function buildConversation(): Promise<Conversation> {
   }
 
   try {
-    conv.attachments = detectAttachments(document);
+    conv.attachments = detectAttachments(document, adapter);
     logger.debug("Detected attachments", { count: conv.attachments.length });
   } catch (e: any) {
     logger.error("Failed to detect attachments", { error: e.message });
@@ -112,13 +103,19 @@ async function buildConversation(): Promise<Conversation> {
   }
 
   try {
-    const postAttachments = detectAttachments(document);
+    const postAttachments = detectAttachments(document, adapter);
     if (postAttachments.length > (conv.attachments?.length || 0)) {
       conv.attachments = postAttachments;
       logger.debug("Updated attachments", { count: conv.attachments.length });
     }
   } catch (e: any) {
     logger.error("Failed to update attachments", { error: e.message });
+  }
+
+  try {
+    appendAttachmentNotes(conv.messages, conv.attachments || []);
+  } catch (e: any) {
+    logger.warn("Failed to append attachment notes", { error: e.message });
   }
 
   try {
@@ -313,8 +310,8 @@ async function handleSaveConversation() {
     // ── Deduplication by chatId + messageCount ──────────────────────────────
     if (conversation.chatId) {
       try {
-        const stored = await chrome.storage.local.get("ai_archiver_history_v1");
-        const history: any[] = stored["ai_archiver_history_v1"] || [];
+        const stored = await chrome.storage.local.get("history_v1");
+        const history: any[] = stored["history_v1"] || [];
 
         const existing = history.find(
           (h) =>
@@ -369,6 +366,37 @@ async function handleSaveConversation() {
   }
 }
 
+async function handleBulkAuthContext() {
+  const adapter = adapterFor(location.href);
+  return adapter?.getOrgId?.(document) || adapter?.getAuthToken?.(document) || "";
+}
+
+async function handleBulkListFromDom(limit = 30, offset = 0) {
+  const adapter = adapterFor(location.href);
+  if (!adapter) return { ok: false, error: "No adapter for this site" };
+  if (adapter.fetchList) {
+    try {
+      const authContext = adapter.getOrgId?.(document) || adapter.getAuthToken?.(document) || "";
+      const result = await adapter.fetchList(authContext, limit, offset);
+      return { ok: true, ...result };
+    } catch (err: any) {
+      logger.warn("Adapter DOM list fetch failed", { error: err.message });
+    }
+  }
+  const items = extractDomConversationList(document, limit, offset);
+  return { ok: true, items, total: items.length };
+}
+
+async function handleBulkDetailFromDom() {
+  try {
+    const conversation = await buildConversation();
+    return { ok: true, conversation };
+  } catch (err: any) {
+    logger.error("DOM detail extraction failed", err);
+    return { ok: false, error: err.message };
+  }
+}
+
 // ─── Message listener ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse) => {
@@ -388,6 +416,12 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
         logger.debug("Processing save-selection command from background");
         await saveSelection();
         sendResponse({ ok: true });
+      } else if (msg.kind === "bulk-auth-context") {
+        sendResponse({ ok: true, authContext: await handleBulkAuthContext() });
+      } else if (msg.kind === "bulk-list-from-dom") {
+        sendResponse(await handleBulkListFromDom(msg.limit, msg.offset));
+      } else if (msg.kind === "bulk-detail-from-dom") {
+        sendResponse(await handleBulkDetailFromDom());
       } else {
         logger.warn("Unknown message kind", { kind: msg.kind });
         sendResponse({ ok: false, error: "Unknown message kind" });

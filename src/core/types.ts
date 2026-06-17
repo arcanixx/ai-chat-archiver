@@ -10,7 +10,7 @@ export type ProviderId =
 
 export type Role = "user" | "assistant" | "system" | "tool";
 
-export type ExportFormat = "md" | "html" | "json";
+export type ExportFormat = "md" | "html" | "json" | "pdf" | "txt";
 
 export type Part =
   | { type: "text"; markdown: string }
@@ -28,6 +28,15 @@ export interface Message {
   parts: Part[];
 }
 
+export interface Attachment {
+  name: string;
+  url: string;
+  mime?: string;
+  data?: Blob | string;
+  savedPath?: string;
+  size?: number;
+}
+
 export interface Conversation {
   schemaVersion: 1;
   provider: ProviderId;
@@ -38,7 +47,25 @@ export interface Conversation {
   capturedAt: string;
   messages: Message[];
   warnings: string[];
-  attachments?: Array<{ name: string; url: string; mime?: string }>;
+  attachments?: Attachment[];
+}
+
+export interface BulkConversationItem {
+  id: string;
+  title: string;
+  url: string;
+  createdAt: string;
+  updatedAt?: string;
+  selected?: boolean;
+}
+
+export interface BulkExportResult {
+  id: string;
+  title: string;
+  success: boolean;
+  error?: string;
+  formats?: ExportFormat[];
+  filename?: string;
 }
 
 export interface Settings {
@@ -51,7 +78,13 @@ export interface Settings {
   perProvider: Record<ProviderId, boolean>;
   batchConcurrency: number;
   downloadAttachments: boolean;
+  saveAttachments: boolean;
+  attachmentsFolder: string;
+  enablePDFExport: boolean;
+  bulkLimit: number;
+  bulkProvider: ProviderId | null;
   titlePrefixIgnore: string;
+  bulkDefaultFormat: ExportFormat;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -73,7 +106,13 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   batchConcurrency: 2,
   downloadAttachments: false,
+  saveAttachments: false,
+  attachmentsFolder: "attachments",
+  enablePDFExport: false,
+  bulkLimit: 30,
+  bulkProvider: null,
   titlePrefixIgnore: "",
+  bulkDefaultFormat: "md",
 };
 
 export type RuntimeMessage =
@@ -87,6 +126,13 @@ export type RuntimeMessage =
   | { kind: "batch-cancel" }
   | { kind: "batch-status" }
   | { kind: "batch-extract"; url: string; provider: ProviderId }
+  | { kind: "bulk-auth-context" }
+  | { kind: "bulk-list-from-dom"; limit?: number; offset?: number }
+  | { kind: "bulk-detail-from-dom" }
+  | { kind: "bulk-export"; format: ExportFormat }
+  | { kind: "bulk-export-progress"; data: { progress: number; message: string } }
+  | { kind: "bulk-export-complete"; data: { success: boolean; error?: string } }
+  | { kind: "show-main-popup" }
   | { kind: "get-history" }
   | { kind: "get-logs" }
   | { kind: "clear-logs" }
@@ -103,6 +149,7 @@ export interface HistoryEntry {
   formats: ExportFormat[];
   warnings: number;
   messageCount: number;
+  attachmentCount?: number;
 }
 
 export interface TrackedChat {

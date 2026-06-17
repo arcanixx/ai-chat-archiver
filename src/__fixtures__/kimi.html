@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Docker Compose for Full-Stack App — Kimi</title></head>
+<body>
+<div class="chat-name">Docker Compose for Full-Stack App</div>
+
+<div class="chat-content-item-user" data-role="user">
+  <div class="markdown-container">
+    <p>I need a Docker Compose setup for a full-stack app with React frontend, Node.js backend, and MongoDB.</p>
+  </div>
+  <time datetime="2026-06-15T11:00:00Z">11:00 AM</time>
+</div>
+
+<div class="chat-content-item-assistant" data-role="assistant">
+  <div class="message-content">
+    <p>Here's a complete Docker Compose setup for your stack:</p>
+    <pre><code class="language-yaml">version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGODB_URI=mongodb://db:27017/myapp
+      - NODE_ENV=development
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  db:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secret
+
+volumes:
+  mongo_data:</code></pre>
+  </div>
+  <div class="thinking-content">
+    <p>The user needs development-focused setup with hot-reloading. I'll use bind mounts for source code and exclude node_modules to keep performance optimal.</p>
+  </div>
+  <iframe src="https://kimi.com/preview/docker-compose.html">
+    <html><body><pre>Preview: docker-compose.yml validated successfully</pre></body></html>
+  </iframe>
+  <time datetime="2026-06-15T11:00:15Z">11:00 AM</time>
+</div>
+
+<div class="chat-content-item-user" data-role="user">
+  <div class="markdown-container">
+    <p>How do I add a Redis cache layer?</p>
+  </div>
+  <time datetime="2026-06-15T11:05:00Z">11:05 AM</time>
+</div>
+
+<div class="chat-content-item-assistant" data-role="assistant">
+  <div class="message-content">
+    <p>Add a Redis service to your docker-compose.yml:</p>
+    <pre><code class="language-yaml">  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis_data:</code></pre>
+    <p>And update your backend to use Redis:</p>
+    <pre><code class="language-javascript">const redis = require('redis');
+const client = redis.createClient({
+  url: process.env.REDIS_URL || 'redis://redis:6379'
+});
+
+async function getCachedData(key) {
+  const cached = await client.get(key);
+  if (cached) return JSON.parse(cached);
+
+  const data = await fetchFromDatabase(key);
+  await client.setEx(key, 3600, JSON.stringify(data));
+  return data;
+}</code></pre>
+  </div>
+  <div class="thinking-content">
+    <p>I'll also mention RedisInsight for local debugging and suggest using ioredis over redis npm package for better performance.</p>
+  </div>
+  <time datetime="2026-06-15T11:05:20Z">11:05 AM</time>
+</div>
+<div class="chat-content-item-user" data-role="user">
+  <div class="markdown-container">
+    <p>Thanks!</p>
+  </div>
+</div>
+
+<div class="side-panel">
+  <pre><code>Preview panel content with docker-compose validation results
+All services validated successfully. Port mappings OK.</code></pre>
+</div>
+</body>
+</html>

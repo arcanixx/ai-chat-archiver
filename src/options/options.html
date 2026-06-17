@@ -72,6 +72,28 @@
     <label class="checkbox-label"><input type="checkbox" id="fmt-md"> Markdown (.md)</label>
     <label class="checkbox-label"><input type="checkbox" id="fmt-json"> JSON (.json)</label>
     <label class="checkbox-label"><input type="checkbox" id="fmt-html"> HTML (.html)</label>
+    <label class="checkbox-label"><input type="checkbox" id="fmt-pdf"> PDF (.pdf)</label>
+  </div>
+
+  <h2>Bulk Export Settings</h2>
+  <div class="form-group">
+    <label class="checkbox-label"><input type="checkbox" id="bulkSaveAttachments"> Save attachments with bulk export</label>
+    <div class="hint">When enabled, all attachments will be downloaded and included in the exported conversation.</div>
+  </div>
+
+  <div class="form-group">
+    <label class="checkbox-label"><input type="checkbox" id="bulkDownloadAttachments"> Download attachments separately</label>
+    <div class="hint">When enabled, attachments will be downloaded as individual files in addition to being included in the conversation.</div>
+  </div>
+
+  <div class="form-group">
+    <label>Bulk export format:</label>
+    <select id="bulkDefaultFormat">
+      <option value="md">Markdown (.md)</option>
+      <option value="txt">Plain Text (.txt)</option>
+      <option value="pdf">PDF (.pdf)</option>
+    </select>
+    <div class="hint">Default format for bulk exports. Can be overridden in the bulk export popup.</div>
   </div>
 
   <h2>Keyboard Shortcuts</h2>

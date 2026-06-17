@@ -143,9 +143,10 @@ export async function injectFloatingButton(onSave: () => void, onSaveSelection: 
         chrome.storage.sync.set({
           floatingButtonPosition: { x: rect.left, y: rect.top }
         });
+        // Clear drag flag so next click is not ignored
+        dragOccurred = false;
       }
       isDragging = false;
-      // dragOccurred is reset in the click handler after it's checked
     };
     
     document.addEventListener("mousemove", onMove);

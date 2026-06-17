@@ -1,4 +1,5 @@
 import { expandUntilStable, nodeToParts, readTimestamp, type ProviderAdapter } from "./base";
+import { extractAttachmentsFromDocument } from "../core/attachments";
 import type { Message } from "../core/types";
 
 export const deepseekAdapter: ProviderAdapter = {
@@ -13,16 +14,14 @@ export const deepseekAdapter: ProviderAdapter = {
     const firstUser = doc.querySelector(".ds-message:not(:has(.ds-assistant-message-main-content))");
     if (firstUser?.textContent) return firstUser.textContent.trim().slice(0, 60);
     
-    return "DeepSeek conversation";
+    return "Untitled conversation";
   },
   
   async expandAll(doc) {
-    // First, scroll to bottom multiple times to trigger lazy loading of older messages
     const main = doc.querySelector("main") ?? doc.scrollingElement ?? doc.body;
     for (let i = 0; i < 8; i++) {
       main.scrollTop = main.scrollHeight;
       await new Promise((r) => setTimeout(r, 800));
-      // Check if "Load more" / "Show earlier" button exists and click it
       const loadMoreBtn = Array.from(doc.querySelectorAll<HTMLElement>("button")).find((btn) => {
         const txt = btn.textContent?.trim().toLowerCase() || "";
         return txt.includes("load more") || txt.includes("show earlier") || txt.includes("更多") || txt.includes("加载更多");
@@ -32,7 +31,6 @@ export const deepseekAdapter: ProviderAdapter = {
         await new Promise((r) => setTimeout(r, 1000));
       }
     }
-    // Then expand thinking/reasoning sections
     await expandUntilStable(doc, [
       'div[class*="thinking"] button',
       'button[aria-expanded="false"]',
@@ -65,5 +63,11 @@ export const deepseekAdapter: ProviderAdapter = {
     }
     
     return messages;
+  },
+
+  supportsBulk: true,
+
+  extractAttachments(doc) {
+    return extractAttachmentsFromDocument(doc);
   },
 };

@@ -1,6 +1,7 @@
 import { expandUntilStable, nodeToParts, readTimestamp, type ProviderAdapter } from "./base";
 import { logger } from "../core/logger";
-import type { Message, Part } from "../core/types";
+import { extractAttachmentsFromDocument } from "../core/attachments";
+import type { Attachment, Message, Part } from "../core/types";
 
 export const claudeAdapter: ProviderAdapter = {
   id: "claude",
@@ -16,7 +17,7 @@ export const claudeAdapter: ProviderAdapter = {
     const firstHeading = doc.querySelector(".font-claude-response h1, .font-claude-response h2");
     if (firstHeading?.textContent?.trim()) return firstHeading.textContent.trim();
     
-    return doc.title.replace(/\s*[-–|]\s*Claude.*$/i, "").trim() || "Claude conversation";
+    return doc.title.replace(/\s*[-–|]\s*Claude.*$/i, "").trim() || "Untitled conversation";
   },
   
   async expandAll(doc) {
@@ -74,7 +75,6 @@ export const claudeAdapter: ProviderAdapter = {
     
     logger.debug("Artifact expansion completed", { clickCount });
     
-    // Wait for any opened artifact panels to load content
     await new Promise((r) => setTimeout(r, 1500));
     logger.debug("Waiting period completed");
   },
@@ -96,7 +96,6 @@ export const claudeAdapter: ProviderAdapter = {
       
       logger.debug("Sorted message blocks", { totalCount: all.length });
       
-      // First pass: extract messages and in-message artifacts
       for (const { role, el } of all) {
         try {
           const parts = nodeToParts(el);
@@ -139,13 +138,10 @@ export const claudeAdapter: ProviderAdapter = {
         }
       }
       
-      // Second pass: find artifacts in sidebar/panel (global to document)
-      // These are artifacts created during the conversation but rendered in a separate panel
       try {
         const globalArtifacts = findGlobalArtifacts(doc);
         if (globalArtifacts.length > 0) {
           logger.debug("Found global artifacts", { count: globalArtifacts.length });
-          // Attach global artifacts to the last assistant message (or create a synthetic one)
           const lastAssistantIdx = messages.findLastIndex((m) => m.role === "assistant");
           if (lastAssistantIdx >= 0) {
             messages[lastAssistantIdx].parts.push(...globalArtifacts);
@@ -168,7 +164,220 @@ export const claudeAdapter: ProviderAdapter = {
       throw new Error(`Extraction failed: ${e.message}`);
     }
   },
+
+  getOrgId(doc) {
+    return getOrgIdFromPage(doc);
+  },
+
+  supportsBulk: true,
+
+  async fetchList(authContext: string, limit: number, offset: number) {
+    const orgId = authContext;
+    if (!orgId) throw new Error("Organization ID required for Claude bulk");
+
+    const url = `https://claude.ai/api/organizations/${orgId}/chat_conversations?limit=${limit}&offset=${offset}`;
+    const response = await fetch(url, {
+      credentials: "include",
+      headers: { accept: "*/*" },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+      items: data.map((item: any) => ({
+        id: item.uuid,
+        title: item.name || "Untitled",
+        url: `https://claude.ai/chat/${item.uuid}`,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      })),
+      nextOffset: data.length === limit ? offset + limit : undefined,
+      total: data.length,
+    };
+  },
+
+  async fetchDetail(authContext: string, conversationId: string) {
+    const orgId = authContext;
+    if (!orgId) throw new Error("Organization ID required for Claude bulk");
+
+    const url = `https://claude.ai/api/organizations/${orgId}/chat_conversations/${conversationId}?tree=True&rendering_mode=messages&render_all_tools=true`;
+    const response = await fetch(url, {
+      credentials: "include",
+      headers: { accept: "*/*" },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  },
+
+  async parseBulkData(data: any, options: any = {}) {
+    const messages: Message[] = [];
+    const attachments: Attachment[] = [];
+    const warnings: string[] = [];
+    const artifactMemory: Record<string, { current: string; title: string; type: string; version: number }> = {};
+
+    const chatMessages = data.chat_messages || [];
+
+    for (const msg of chatMessages) {
+      const role = msg.sender === "human" ? "user" : msg.sender === "assistant" ? "assistant" : "tool";
+      const contentParts: string[] = [];
+
+      for (const content of msg.content || []) {
+        if (!content) continue;
+
+        if (content.type === "text" && content.text) {
+          contentParts.push(content.text);
+          continue;
+        }
+
+        if (content.type === "tool_result") {
+          const result = typeof content.content === "string"
+            ? content.content
+            : content.content?.[0]?.text || content.text || "";
+          if (result) contentParts.push(result);
+          continue;
+        }
+
+        if (content.type === "tool_use") {
+          const toolName = content.name || "";
+          const input = content.input || {};
+
+          if (toolName === "artifacts") {
+            const artifactId = input.id || content.id || input.version_uuid || `artifact-${attachments.length + 1}`;
+            const command = input.command || "create";
+            const type = input.type || input.textdoc_type || "text/plain";
+            const title = input.title || artifactId;
+
+            let contentStr = "";
+
+            if (command === "create" || command === "rewrite") {
+              contentStr = typeof input.content === "string"
+                ? input.content
+                : JSON.stringify(input.content || input, null, 2);
+            } else if (command === "update") {
+              const current = artifactMemory[artifactId]?.current || "";
+              const oldStr = input.old_str || "";
+              const newStr = input.new_str || (typeof input.content === "string" ? input.content : "");
+              if (current.includes(oldStr)) {
+                contentStr = current.replace(oldStr, newStr);
+              } else {
+                contentStr = `${current}\n\n/* patch_failed: "${oldStr}" not found */\n${newStr}`;
+              }
+            } else {
+              contentStr = typeof input.content === "string"
+                ? input.content
+                : JSON.stringify(input.content || input, null, 2);
+            }
+
+            const version = (artifactMemory[artifactId]?.version || 0) + 1;
+            const finalId = input.version_uuid || `${artifactId}-v${version}`;
+
+            if (options.saveAttachments) {
+              attachments.push({
+                name: `${title} (v${version}).${getExtensionFromMime(type)}`,
+                url: `data:text/plain;base64,${btoa(unescape(encodeURIComponent(contentStr)))}`,
+                mime: type,
+                data: contentStr,
+              });
+            }
+
+            artifactMemory[artifactId] = {
+              current: contentStr,
+              title: title,
+              type: type,
+              version: version,
+            };
+
+            contentParts.push(`**[Artifact: ${title} v${version} / ${finalId}]**\n\n\`\`\`${getLanguageFromMime(type)}\n${contentStr}\n\`\`\``);
+          } else {
+            contentParts.push(`**Tool: ${toolName}**\n\`\`\`json\n${JSON.stringify(input, null, 2)}\n\`\`\``);
+          }
+          continue;
+        }
+
+        if (content.text) contentParts.push(content.text);
+      }
+
+      const contentText = contentParts.filter(Boolean).join("\n\n") || " ";
+      messages.push({
+        role: role as any,
+        parts: [{ type: "text", markdown: contentText }],
+        createdAt: msg.created_at,
+      });
+    }
+
+    return {
+      title: data.name || "Claude conversation",
+      url: `https://claude.ai/chat/${data.uuid}`,
+      chatId: data.uuid,
+      providerModel: data.model || undefined,
+      messages,
+      attachments,
+      warnings,
+    };
+  },
+
+  extractAttachments(doc) {
+    return extractAttachmentsFromDocument(doc);
+  },
 };
+
+function getOrgIdFromPage(doc: Document): string | null {
+  const html = doc.documentElement.innerHTML;
+  const match = html.match(/https:\/\/claude\.ai\/api\/organizations\/([a-f0-9-]{36})/);
+  if (match?.[1]) return match[1];
+
+  try {
+    const statuses = JSON.parse(sessionStorage.getItem("SSS-cardamom-integration-statuses") || "{}");
+    if (statuses?.orgUuid) return statuses.orgUuid;
+  } catch {
+    // Ignore missing or malformed session storage.
+  }
+
+  return null;
+}
+
+function getExtensionFromMime(mime: string): string {
+  const map: Record<string, string> = {
+    "text/plain": "txt",
+    "text/markdown": "md",
+    "text/html": "html",
+    "application/json": "json",
+    "text/x-python": "py",
+    "text/javascript": "js",
+    "text/typescript": "ts",
+    "text/x-rust": "rs",
+    "text/x-c": "c",
+    "text/x-cpp": "cpp",
+    "text/x-java": "java",
+    "text/x-go": "go",
+  };
+  return map[mime] || mime.split("/").pop() || "txt";
+}
+
+function getLanguageFromMime(mime: string): string {
+  const map: Record<string, string> = {
+    "text/plain": "text",
+    "text/markdown": "markdown",
+    "text/html": "html",
+    "application/json": "json",
+    "text/x-python": "python",
+    "text/javascript": "javascript",
+    "text/typescript": "typescript",
+    "text/x-rust": "rust",
+    "text/x-c": "c",
+    "text/x-cpp": "cpp",
+    "text/x-java": "java",
+    "text/x-go": "go",
+  };
+  return map[mime] || mime.split("/").pop() || "text";
+}
 
 function findArtifactCards(assistantBody: Element): Element[] {
   logger.debug("Finding artifact cards in assistant body");
@@ -210,7 +419,6 @@ function findGlobalArtifacts(doc: Document): Part[] {
   logger.debug("Finding global artifacts in document");
   const artifacts: Part[] = [];
   
-  // Look for artifact panels in the sidebar or dedicated artifact area
   const selectors = [
     '[data-testid*="artifact"]',
     '[class*="artifact-panel"]',
@@ -227,16 +435,13 @@ function findGlobalArtifacts(doc: Document): Part[] {
       
       elements.forEach((el) => {
         try {
-          // Find title
           const titleEl = el.querySelector("h3, h4, [class*='title']") || el.closest('[class*="artifact"]')?.querySelector("h3, h4, [class*='title']");
           const title = titleEl?.textContent?.trim() || el.textContent?.trim().slice(0, 80) || "Artifact";
-          
-          // Find code
           const codeEl = el.querySelector("pre code") as HTMLElement;
           const code = codeEl?.innerText || codeEl?.textContent || (el.tagName === "CODE" ? el.textContent : "");
           const lang = codeEl?.className.match(/language-([\w+-]+)/)?.[1];
           
-          if (code && code.length > 10) { // Only add if there's substantial code
+          if (code && code.length > 10) {
             artifacts.push({ type: "artifact", title, lang, code });
             logger.debug("Added global artifact", { title, lang, codeLength: code.length });
           }

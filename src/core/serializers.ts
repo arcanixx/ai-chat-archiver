@@ -1,5 +1,6 @@
 import type { Conversation, Part, Message } from "./types";
 import { repairFences } from "./fence";
+import { toPdf } from "./serializers-pdf";
 
 const ROLE_LABEL: Record<string, string> = {
   user: "🧑 User",
@@ -165,5 +166,7 @@ ${messages}
 export function serialize(c: Conversation, format: string) {
   if (format === "md") return { text: toMarkdown(c), mime: "text/markdown", ext: "md" };
   if (format === "html") return { text: toHtml(c), mime: "text/html", ext: "html" };
+  if (format === "pdf") return toPdf(c);
   return { text: toJson(c), mime: "application/json", ext: "json" };
 }
+

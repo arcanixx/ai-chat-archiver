@@ -1,15 +1,17 @@
 import { expandUntilStable, nodeToParts, readTimestamp, type ProviderAdapter } from "./base";
+import { extractAttachmentsFromDocument } from "../core/attachments";
 import type { Message } from "../core/types";
 
 export const chatgptAdapter: ProviderAdapter = {
   id: "chatgpt",
   match: (u) => u.hostname === "chatgpt.com" || u.hostname === "chat.openai.com",
+  isFullyExpandedView: (u) => u.pathname.startsWith("/share/"),
   
   getTitle(doc) {
     return (
       doc.querySelector('nav a[aria-current="page"]')?.textContent?.trim() ||
       doc.title.replace(/\s*[-–|]\s*ChatGPT.*$/i, "").trim() ||
-      "ChatGPT conversation"
+      "Untitled conversation"
     );
   },
   
@@ -36,5 +38,11 @@ export const chatgptAdapter: ProviderAdapter = {
     }
     
     return messages;
+  },
+
+  supportsBulk: true,
+
+  extractAttachments(doc) {
+    return extractAttachmentsFromDocument(doc);
   },
 };

@@ -12,7 +12,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btn-save")?.addEventListener("click", async () => {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, { kind: "extract-and-save", formats: ["md"] } as RuntimeMessage);
+      try {
+        await chrome.tabs.sendMessage(tabs[0].id, { kind: "extract-and-save", formats: ["md"] } as RuntimeMessage);
+      } catch (err) {
+        console.error("Failed to send save message:", err);
+      }
       window.close();
     }
   });
@@ -20,9 +24,20 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btn-selection")?.addEventListener("click", async () => {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, { kind: "save-selection" } as RuntimeMessage);
+      try {
+        await chrome.tabs.sendMessage(tabs[0].id, { kind: "save-selection" } as RuntimeMessage);
+      } catch (err) {
+        console.error("Failed to send selection message:", err);
+      }
       window.close();
     }
+  });
+
+  document.getElementById("btn-bulk")?.addEventListener("click", () => {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL("src/bulk/bulk-popup.html")
+    });
+    window.close();
   });
 
   document.getElementById("btn-options")?.addEventListener("click", () => {

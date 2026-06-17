@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Azure DevOps CI/CD Pipeline Setup — Copilot</title></head>
+<body>
+
+<cib-chat-turn data-role="user">
+  <div>
+    <p>Help me set up a CI/CD pipeline with Azure DevOps for a .NET microservices project.</p>
+  </div>
+  <time datetime="2026-06-15T15:00:00Z">3:00 PM</time>
+</cib-chat-turn>
+
+<cib-chat-turn data-role="assistant">
+  <div>
+    <p>Here's a complete Azure DevOps pipeline setup:</p>
+    <h2>1. Build Pipeline (azure-pipelines.yml)</h2>
+    <pre><code class="language-yaml">trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  solution: '**/*.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+
+steps:
+- task: NuGetToolInstaller@1
+
+- task: NuGetCommand@2
+  inputs:
+    restoreSolution: '$(solution)'
+
+- task: VSBuild@1
+  inputs:
+    solution: '$(solution)'
+    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true'
+    platform: '$(buildPlatform)'
+    configuration: '$(buildConfiguration)'
+
+- task: VSTest@2
+  inputs:
+    platform: '$(buildPlatform)'
+    configuration: '$(buildConfiguration)'</code></pre>
+
+    <h2>2. Docker Multi-Stage Build</h2>
+    <pre><code class="language-dockerfile">FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /app
+
+COPY *.sln .
+COPY src/*.csproj ./src/
+RUN dotnet restore
+
+COPY . .
+RUN dotnet publish -c Release -o out
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/out .
+ENTRYPOINT ["dotnet", "MyService.dll"]</code></pre>
+  </div>
+  <time datetime="2026-06-15T15:00:20Z">3:00 PM</time>
+</cib-chat-turn>
+
+<cib-chat-turn class="user">
+  <div>
+    <p>How do I add Terraform infrastructure deployment to this pipeline?</p>
+  </div>
+  <time datetime="2026-06-15T15:05:00Z">3:05 PM</time>
+</cib-chat-turn>
+
+<cib-chat-turn data-role="assistant">
+  <div>
+    <p>Add a Terraform stage to your pipeline:</p>
+    <pre><code class="language-yaml">- stage: Infrastructure
+  jobs:
+  - job: DeployInfra
+    steps:
+    - task: TerraformInstaller@1
+      displayName: 'Install Terraform'
+
+    - task: TerraformCLI@2
+      displayName: 'Terraform Init'
+      inputs:
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+
+    - task: TerraformCLI@2
+      displayName: 'Terraform Plan'
+      inputs:
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+        environmentServiceName: 'my-azure-service-connection'
+
+    - task: TerraformCLI@2
+      displayName: 'Terraform Apply'
+      inputs:
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+        environmentServiceName: 'my-azure-service-connection'</code></pre>
+    <p>For state management, use Azure Storage backend:</p>
+    <pre><code class="language-hcl">terraform {
+  backend "azurerm" {
+    resource_group_name  = "tfstate-rg"
+    storage_account_name = "tfstatestorage"
+    container_name       = "tfstate"
+    key                  = "microservices.terraform.tfstate"
+  }
+}</code></pre>
+  </div>
+  <time datetime="2026-06-15T15:05:20Z">3:05 PM</time>
+</cib-chat-turn>
+
+<button aria-expanded="false" style="display:none">Show more</button>
+</body>
+</html>

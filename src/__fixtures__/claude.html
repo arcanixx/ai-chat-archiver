@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>React Architecture Review — Claude</title></head>
+<body>
+<div data-testid="page-header"><h1>React Architecture Review</h1></div>
+
+<div data-testid="user-message">
+  <p>Can you review my React component architecture and suggest improvements?</p>
+  <time datetime="2026-06-15T14:30:00Z">2:30 PM</time>
+</div>
+
+<div class="font-claude-response">
+  <p>Let me analyze your architecture. Here are my key observations:</p>
+  <h2>Current Structure</h2>
+  <ul>
+    <li>Monolithic components doing too much</li>
+    <li>No separation between data fetching and presentation</li>
+    <li>Missing error boundaries</li>
+  </ul>
+  <h2>Recommendations</h2>
+  <ol>
+    <li>Split into container/presenter pattern</li>
+    <li>Add React Query for data fetching</li>
+    <li>Implement proper error boundaries</li>
+  </ol>
+  <pre><code class="language-tsx">// Suggested ErrorBoundary component
+import { Component, ReactNode } from 'react';
+
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error?: Error;
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false };
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback ?? <h1>Something went wrong</h1>;
+    }
+    return this.props.children;
+  }
+}</code></pre>
+  <table>
+    <thead><tr><th>Pattern</th><th>Complexity</th><th>Testability</th></tr></thead>
+    <tbody>
+      <tr><td>Container/Presenter</td><td>Low</td><td>High</td></tr>
+      <tr><td>Custom Hooks</td><td>Medium</td><td>Medium</td></tr>
+      <tr><td>Render Props</td><td>High</td><td>Low</td></tr>
+    </tbody>
+  </table>
+  <time datetime="2026-06-15T14:30:15Z">2:30 PM</time>
+</div>
+
+<div data-testid="user-message">
+  <p>Can you show me an example with a custom hook?</p>
+  <time datetime="2026-06-15T14:31:00Z">2:31 PM</time>
+</div>
+
+<div class="font-claude-response">
+  <p>Here's a custom hook example with proper TypeScript typing:</p>
+  <pre><code class="language-tsx">function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+</code></pre>
+  <p>And here's how to use it in a search component:</p>
+  <pre><code class="language-tsx">function SearchComponent() {
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 300);
+  const { data, isLoading } = useSearchQuery(debouncedQuery);
+
+  return (
+    <div>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search..."
+      />
+      {isLoading && <Spinner />}
+      <Results data={data} />
+    </div>
+  );
+}</code></pre>
+  <time datetime="2026-06-15T14:31:20Z">2:31 PM</time>
+</div>
+
+<div data-testid="user-message">
+  <p>What about testing this with Vitest?</p>
+  <time datetime="2026-06-15T14:32:00Z">2:32 PM</time>
+</div>
+
+<div class="font-claude-response">
+  <p>Here's how to test the debounce hook with Vitest:</p>
+  <pre><code class="language-tsx">import { renderHook, act } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { useDebounce } from './useDebounce';
+
+describe('useDebounce', () => {
+  it('should return initial value immediately', () => {
+    const { result } = renderHook(() => useDebounce('hello', 300));
+    expect(result.current).toBe('hello');
+  });
+
+  it('should debounce value changes', async () => {
+    vi.useFakeTimers();
+    const { result, rerender } = renderHook(
+      ({ value }) => useDebounce(value, 300),
+      { initialProps: { value: 'hello' } }
+    );
+
+    rerender({ value: 'world' });
+    expect(result.current).toBe('hello');
+
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(result.current).toBe('world');
+
+    vi.useRealTimers();
+  });
+});</code></pre>
+  <time datetime="2026-06-15T14:32:10Z">2:32 PM</time>
+</div>
+
+<button aria-label="Show more" aria-expanded="false" data-state="closed" style="display:none">Show more</button>
+<button aria-label="Thinking" style="display:none">Thinking</button>
+</body>
+</html>

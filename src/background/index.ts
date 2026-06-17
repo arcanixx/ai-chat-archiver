@@ -5,7 +5,8 @@ import { buildFilename } from "../core/filename";
 import { pushHistory } from "./history";
 import { adapterFor } from "../adapters";
 import { batchProcessor } from "../core/batch-processor";
-import type { Conversation, ExportFormat, RuntimeMessage, ProviderId } from "../core/types";
+import { attachmentToMarkdown, mergeAttachments } from "../core/attachments";
+import type { Attachment, Conversation, ExportFormat, HistoryEntry, RuntimeMessage, ProviderId } from "../core/types";
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -31,6 +32,84 @@ async function downloadOne(conv: Conversation, format: ExportFormat, settings: a
   return filename;
 }
 
+async function fetchAttachment(url: string): Promise<Blob> {
+  if (url.startsWith("data:")) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch data attachment: ${response.status}`);
+    return await response.blob();
+  }
+
+  const response = await fetch(url, {
+    credentials: "include",
+    headers: { accept: "*/*" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch attachment: ${response.status} ${response.statusText}`);
+  }
+
+  return await response.blob();
+}
+
+async function saveAttachment(blob: Blob, filename: string, folder: string): Promise<string> {
+  const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^_+|_+$/g, "") || "attachment";
+  const fullPath = `${folder.replace(/\/+$/, "")}/${safeFilename}`;
+  const url = URL.createObjectURL(blob);
+  try {
+    await chrome.downloads.download({
+      url,
+      filename: fullPath,
+      conflictAction: "uniquify",
+      saveAs: false,
+    });
+  } catch (err: any) {
+    logger.error("Failed to save attachment", err);
+    throw err;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+
+  return fullPath;
+}
+
+async function saveConversationAttachments(conv: Conversation, settings: any): Promise<void> {
+  if ((!settings.saveAttachments && !settings.downloadAttachments) || !conv.attachments?.length) return;
+  const folder = settings.attachmentsFolder || "attachments";
+
+  for (const att of conv.attachments) {
+    try {
+      let blob: Blob;
+      if (att.data) {
+        if (typeof att.data === "string" && att.data.startsWith("data:")) {
+          blob = await fetchAttachment(att.data);
+        } else {
+          blob = new Blob([att.data], { type: att.mime || "text/plain" });
+        }
+      } else if (att.url) {
+        blob = await fetchAttachment(att.url);
+      } else {
+        continue;
+      }
+
+      const savedPath = await saveAttachment(blob, att.name, folder);
+      att.savedPath = savedPath;
+
+      const lastMsg = conv.messages[conv.messages.length - 1];
+      if (lastMsg?.parts.length) {
+        const lastPart = lastMsg.parts[lastMsg.parts.length - 1];
+        if (lastPart.type === "text") {
+          lastPart.markdown += `\n\n${attachmentToMarkdown(att)}`;
+        } else {
+          lastMsg.parts.push({ type: "text", markdown: attachmentToMarkdown(att) });
+        }
+      }
+    } catch (err: any) {
+      logger.error(`Failed to save attachment ${att.name}`, err);
+      conv.warnings.push(`Failed to save attachment: ${att.name} - ${err.message}`);
+    }
+  }
+}
+
 async function extractConversationFromTab(tabId: number, provider: ProviderId): Promise<Conversation> {
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(tabId, { kind: "extract-only" }, (response) => {
@@ -51,7 +130,6 @@ async function extractConversationFromUrl(url: string, provider: ProviderId): Pr
     return extractConversationFromTab(tabs[0].id, provider);
   }
   
-  // Create a new tab if needed
   const tab = await chrome.tabs.create({ url, active: false });
   if (!tab.id) throw new Error("Failed to create tab");
   
@@ -72,35 +150,45 @@ async function extractConversationFromUrl(url: string, provider: ProviderId): Pr
   }
 }
 
+function historyFromConversation(conv: Conversation, formats: ExportFormat[], filename: string): HistoryEntry {
+  return {
+    id: Date.now().toString(),
+    at: conv.capturedAt,
+    provider: conv.provider,
+    title: conv.title,
+    url: conv.url,
+    chatId: conv.chatId,
+    filename,
+    formats,
+    warnings: conv.warnings.length,
+    messageCount: conv.messages.length,
+    attachmentCount: conv.attachments?.length || 0,
+  };
+}
+
 chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse) => {
   if (msg.kind === "save-conversation") {
     (async () => {
       try {
         const settings = await getSettings();
+        const conv = msg.conversation;
+        conv.attachments = mergeAttachments(conv.attachments);
         let firstFilename = "";
-        
+
+        await saveConversationAttachments(conv, settings);
+
         for (const fmt of msg.formats) {
-          const fn = await downloadOne(msg.conversation, fmt, settings);
+          const fn = await downloadOne(conv, fmt, settings);
           if (!firstFilename) firstFilename = fn;
         }
         
-        await pushHistory({
-          id: Date.now().toString(),
-          at: msg.conversation.capturedAt,
-          provider: msg.conversation.provider,
-          title: msg.conversation.title,
-          url: msg.conversation.url,
-          chatId: msg.conversation.chatId,
-          filename: firstFilename,
-          formats: msg.formats,
-          warnings: msg.conversation.warnings.length,
-          messageCount: msg.conversation.messages.length,
-        });
+        await pushHistory(historyFromConversation(conv, msg.formats, firstFilename));
         
         logger.info("Saved conversation", {
-          title: msg.conversation.title,
-          provider: msg.conversation.provider,
+          title: conv.title,
+          provider: conv.provider,
           formats: msg.formats,
+          attachmentCount: conv.attachments?.length || 0,
         });
         
         sendResponse({ ok: true });
@@ -160,8 +248,6 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
     })();
     return true;
   }
-
-  // ── Batch lifecycle ──────────────────────────────────────────────────────
 
   if (msg.kind === "batch-start") {
     (async () => {
@@ -224,31 +310,23 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
   }
 });
 
-// ── Batch result tracking ─────────────────────────────────────────────────
-let batchResults: Array<{ id: string; url: string; status: string; error?: string; messageCount?: number; }> = [];
+let batchResults: Array<{ id: string; url: string; status: string; error?: string; messageCount?: number; attachmentCount?: number; }> = [];
 let batchFormats: ExportFormat[] = ["md"];
 
 batchProcessor.onJobUpdate((job) => {
   if (job.status === "completed" && job.result) {
-    // Download the completed conversation
     (async () => {
       try {
         const settings = await getSettings();
+        const conv = job.result!;
+        conv.attachments = mergeAttachments(conv.attachments);
+        await saveConversationAttachments(conv, settings);
+        let firstFilename = "";
         for (const fmt of batchFormats) {
-          await downloadOne(job.result!, fmt, settings);
+          const fn = await downloadOne(conv, fmt, settings);
+          if (!firstFilename) firstFilename = fn;
         }
-        await pushHistory({
-          id: Date.now().toString(),
-          at: job.result!.capturedAt,
-          provider: job.result!.provider,
-          title: job.result!.title,
-          url: job.result!.url,
-          chatId: job.result!.chatId,
-          filename: "",
-          formats: batchFormats,
-          warnings: job.result!.warnings.length,
-          messageCount: job.result!.messages.length,
-        });
+        await pushHistory(historyFromConversation(conv, batchFormats, firstFilename));
       } catch (err: any) {
         logger.error("Batch download failed", { id: job.id, error: err.message });
       }
@@ -259,6 +337,7 @@ batchProcessor.onJobUpdate((job) => {
       url: job.url,
       status: "completed",
       messageCount: job.result.messages.length,
+      attachmentCount: job.result.attachments?.length || 0,
     });
   } else if (job.status === "failed") {
     batchResults.push({

@@ -3,5 +3,16 @@
   "extDescription": { "message": "Save AI conversations to Markdown, HTML, or JSON with attachments and artifacts support." },
   "saveButton": { "message": "Save this chat" },
   "saveSelection": { "message": "Save selection as snippet" },
-  "optionsTitle": { "message": "AI Chat Archiver Settings" }
+  "optionsTitle": { "message": "AI Chat Archiver Settings" },
+  "bulkExportTitle": { "message": "Bulk Export" },
+  "bulkStartExport": { "message": "Start Bulk Export" },
+  "bulkStatusTitle": { "message": "Status" },
+  "bulkStatusReady": { "message": "Ready to export" },
+  "bulkActionsTitle": { "message": "Actions" },
+  "bulkCancel": { "message": "Cancel" },
+  "bulkClose": { "message": "Close" },
+  "bulkBack": { "message": "Back to Main" },
+  "formatMarkdown": { "message": "Markdown (.md)" },
+  "formatText": { "message": "Plain Text (.txt)" },
+  "formatPDF": { "message": "PDF (.pdf)" }
 }
