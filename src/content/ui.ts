@@ -77,7 +77,10 @@ export async function injectFloatingButton(onSave: () => void, onSaveSelection: 
   // Click handler: if there's a text selection, save as snippet; otherwise save full conversation
   // Ignores clicks that followed a drag (dragOccurred)
   btn.addEventListener("click", async (e) => {
-    if (e.button !== 0 || btn.classList.contains("loading") || dragOccurred) return;
+    if (e.button !== 0 || btn.classList.contains("loading") || dragOccurred) {
+      dragOccurred = false;
+      return;
+    }
     e.stopPropagation();
     e.preventDefault();
     
@@ -141,10 +144,8 @@ export async function injectFloatingButton(onSave: () => void, onSaveSelection: 
           floatingButtonPosition: { x: rect.left, y: rect.top }
         });
       }
-      // reset flags after mouse up — but dragOccurred must persist until after click
       isDragging = false;
-      // Reset dragOccurred after a short delay so the click handler sees it
-      setTimeout(() => { dragOccurred = false; }, 0);
+      // dragOccurred is reset in the click handler after it's checked
     };
     
     document.addEventListener("mousemove", onMove);

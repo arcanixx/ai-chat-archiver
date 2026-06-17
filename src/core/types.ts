@@ -80,9 +80,13 @@ export type RuntimeMessage =
   | { kind: "extract-and-save"; formats: ExportFormat[] }
   | { kind: "extract-only" }
   | { kind: "save-conversation"; conversation: Conversation; formats: ExportFormat[] }
-  | { kind: "save-selection"; text: string; html?: string; filename?: string }
-  | { kind: "batch-start"; urls: string[]; formats: ExportFormat[] }
+  | { kind: "save-selection"; text?: string; html?: string; filename?: string }
+  | { kind: "batch-start"; urls: string[]; formats: ExportFormat[]; concurrency: number }
+  | { kind: "batch-pause" }
+  | { kind: "batch-resume" }
+  | { kind: "batch-cancel" }
   | { kind: "batch-status" }
+  | { kind: "batch-extract"; url: string; provider: ProviderId }
   | { kind: "get-history" }
   | { kind: "get-logs" }
   | { kind: "clear-logs" }

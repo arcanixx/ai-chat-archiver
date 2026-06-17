@@ -287,19 +287,6 @@ function sendRuntimeMessage(msg: RuntimeMessage): Promise<any> {
   });
 }
 
-/** Strip an optional prefix from a title for deduplication comparison.
- *  Supports comma-separated prefixes like "[OLD], [BLOCKED]". */
-function normalizeTitle(title: string, prefix: string): string {
-  if (!prefix) return title.trim();
-  const prefixes = prefix.split(",").map(p => p.trim()).filter(Boolean);
-  let result = title.trim();
-  for (const p of prefixes) {
-    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    result = result.replace(new RegExp(`^\\s*${escaped}\\s*`, "i"), "").trim();
-  }
-  return result;
-}
-
 // ─── Save conversation ─────────────────────────────────────────────────────────
 
 async function handleSaveConversation() {
@@ -316,25 +303,22 @@ async function handleSaveConversation() {
 
     const settings = await chrome.storage.sync.get({
       enabledFormats: ["md"],
-      titlePrefixIgnore: "",
     });
     const formats: ExportFormat[] = (settings.enabledFormats as ExportFormat[]).length
       ? (settings.enabledFormats as ExportFormat[])
       : ["md"];
 
-    logger.debug("Save settings", { formats, titlePrefixIgnore: settings.titlePrefixIgnore });
+    logger.debug("Save settings", { formats });
 
     // ── Deduplication by chatId + messageCount ──────────────────────────────
     if (conversation.chatId) {
       try {
-        const prefix = ((settings.titlePrefixIgnore as string) ?? "").trim();
         const stored = await chrome.storage.local.get("ai_archiver_history_v1");
         const history: any[] = stored["ai_archiver_history_v1"] || [];
 
         const existing = history.find(
           (h) =>
             h.chatId === conversation.chatId &&
-            normalizeTitle(h.title, prefix) === normalizeTitle(conversation.title, prefix) &&
             h.messageCount === conversation.messages.length
         );
         if (existing) {
@@ -342,7 +326,7 @@ async function handleSaveConversation() {
             chatId: conversation.chatId,
             title: conversation.title 
           });
-          toast("Archive is already up to date ✓");
+          toast("Archive is already up to date");
           return;
         }
         logger.debug("Deduplication check passed", { chatId: conversation.chatId });
@@ -386,9 +370,6 @@ async function handleSaveConversation() {
 }
 
 // ─── Message listener ─────────────────────────────────────────────────────────
-// NOTE: "save-selection" is intentionally NOT handled here.
-// saveSelection() sends the message directly to background.
-// Handling it again here would cause a double-save + double prompt.
 
 chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse) => {
   (async () => {
@@ -402,6 +383,10 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
       } else if (msg.kind === "extract-and-save") {
         logger.debug("Processing extract-and-save request");
         await handleSaveConversation();
+        sendResponse({ ok: true });
+      } else if (msg.kind === "save-selection") {
+        logger.debug("Processing save-selection command from background");
+        await saveSelection();
         sendResponse({ ok: true });
       } else {
         logger.warn("Unknown message kind", { kind: msg.kind });
@@ -419,19 +404,7 @@ chrome.runtime.onMessage.addListener((msg: RuntimeMessage, _sender, sendResponse
   return true;
 });
 
-// ─── Keyboard shortcut ────────────────────────────────────────────────────────
 
-document.addEventListener("keydown", (e) => {
-  try {
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "X") {
-      logger.debug("Keyboard shortcut triggered (Ctrl+Shift+X)");
-      e.preventDefault();
-      saveSelection();
-    }
-  } catch (e: any) {
-    logger.error("Error handling keyboard shortcut", { error: e.message });
-  }
-});
 
 // ─── Inject floating button ───────────────────────────────────────────────────
 
