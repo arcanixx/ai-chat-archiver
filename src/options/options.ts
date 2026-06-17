@@ -13,7 +13,6 @@ import type { ExportFormat } from "../core/types";
     const folderEl = document.getElementById("folder") as HTMLInputElement;
     const templateEl = document.getElementById("filenameTemplate") as HTMLInputElement;
     const btnEl = document.getElementById("showFloatingButton") as HTMLInputElement;
-    const autoSaveEl = document.getElementById("autoSave") as HTMLInputElement;
     const titlePrefixEl = document.getElementById("titlePrefixIgnore") as HTMLInputElement;
     const fmtJsonEl = document.getElementById("fmt-json") as HTMLInputElement;
     const fmtMdEl = document.getElementById("fmt-md") as HTMLInputElement;
@@ -31,7 +30,6 @@ import type { ExportFormat } from "../core/types";
     folderEl.value = settings.folder;
     templateEl.value = settings.filenameTemplate;
     btnEl.checked = settings.showFloatingButton;
-    autoSaveEl.checked = settings.autoSave;
     titlePrefixEl.value = settings.titlePrefixIgnore ?? "";
     // set format checkboxes based on enabledFormats
     fmtJsonEl.checked = settings.enabledFormats.includes("json");
@@ -66,7 +64,6 @@ import type { ExportFormat } from "../core/types";
         folder: folderEl.value,
         filenameTemplate: templateEl.value,
         showFloatingButton: btnEl.checked,
-        autoSave: autoSaveEl.checked,
         titlePrefixIgnore: titlePrefixEl.value.trim(),
         enabledFormats,
         perProvider,

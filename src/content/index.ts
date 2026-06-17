@@ -104,7 +104,7 @@ async function buildConversation(): Promise<Conversation> {
   }
 
   try {
-    conv.messages = adapter.extract(document);
+    conv.messages = await adapter.extract(document);
     logger.debug("Extracted messages", { count: conv.messages.length });
   } catch (e: any) {
     logger.error("Failed to extract messages", { error: e.message });
@@ -206,19 +206,8 @@ async function saveSelection() {
       lang 
     });
 
-    const { promptForSelectionFilename = true } = await chrome.storage.sync.get({
-      promptForSelectionFilename: true,
-    });
-
-    let filename = "snippet";
-    if (promptForSelectionFilename) {
-      const userInput = prompt("Filename for this snippet:", `snippet-${Date.now()}`);
-      if (!userInput) { 
-        logger.debug("User cancelled filename prompt");
-        return; // user cancelled — stop here, do not double-save
-      }
-      filename = userInput.replace(/[^a-z0-9_-]/gi, "-").slice(0, 60);
-    }
+    // Auto-generate filename instead of prompting (prompt can be blocked)
+    const filename = `snippet-${Date.now()}`;
 
     logger.debug("Filename determined", { filename });
 
@@ -242,7 +231,7 @@ async function saveSelection() {
 
     // Send to background once — background does the download
     try {
-      await chrome.runtime.sendMessage({
+      await sendRuntimeMessage({
         kind: "save-selection",
         text: snippet,
         filename: `${filename}.md`,
@@ -272,12 +261,43 @@ async function saveSelection() {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Strip an optional prefix from a title for deduplication comparison. */
+/** Send a message to the background script, with context-invalidation handling. */
+function sendRuntimeMessage(msg: RuntimeMessage): Promise<any> {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage(msg, (response) => {
+        if (chrome.runtime.lastError) {
+          const errMsg = chrome.runtime.lastError.message || "Unknown error";
+          if (errMsg.includes("context invalidated") || errMsg.includes("Receiving end does not exist")) {
+            reject(new Error("Extension context invalidated — please reload this page"));
+          } else {
+            reject(new Error(errMsg));
+          }
+        } else {
+          resolve(response);
+        }
+      });
+    } catch (e: any) {
+      if (e.message?.includes("context invalidated")) {
+        reject(new Error("Extension context invalidated — please reload this page"));
+      } else {
+        reject(e);
+      }
+    }
+  });
+}
+
+/** Strip an optional prefix from a title for deduplication comparison.
+ *  Supports comma-separated prefixes like "[OLD], [BLOCKED]". */
 function normalizeTitle(title: string, prefix: string): string {
   if (!prefix) return title.trim();
-  // Escape regex special chars in the user-supplied prefix
-  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return title.replace(new RegExp(`^\\s*${escaped}\\s*`, "i"), "").trim();
+  const prefixes = prefix.split(",").map(p => p.trim()).filter(Boolean);
+  let result = title.trim();
+  for (const p of prefixes) {
+    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    result = result.replace(new RegExp(`^\\s*${escaped}\\s*`, "i"), "").trim();
+  }
+  return result;
 }
 
 // ─── Save conversation ─────────────────────────────────────────────────────────
@@ -334,7 +354,7 @@ async function handleSaveConversation() {
     // ───────────────────────────────────────────────────────────────────────
 
     try {
-      await chrome.runtime.sendMessage({
+      await sendRuntimeMessage({
         kind: "save-conversation",
         conversation,
         formats,

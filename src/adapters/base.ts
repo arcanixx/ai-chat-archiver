@@ -8,7 +8,7 @@ export interface ProviderAdapter {
   getTitle(doc: Document): string;
   detectModel?(doc: Document): string | undefined;
   expandAll(doc: Document): Promise<void>;
-  extract(doc: Document): Message[];
+  extract(doc: Document): Message[] | Promise<Message[]>;
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

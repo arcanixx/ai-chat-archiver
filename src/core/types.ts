@@ -50,8 +50,6 @@ export interface Settings {
   logLevel: "debug" | "info" | "warn" | "error";
   perProvider: Record<ProviderId, boolean>;
   batchConcurrency: number;
-  autoSave: boolean;
-  promptForSelectionFilename: boolean;
   downloadAttachments: boolean;
   titlePrefixIgnore: string;
 }
@@ -74,8 +72,6 @@ export const DEFAULT_SETTINGS: Settings = {
     unknown: false,
   },
   batchConcurrency: 2,
-  autoSave: false,
-  promptForSelectionFilename: true,
   downloadAttachments: false,
   titlePrefixIgnore: "",
 };

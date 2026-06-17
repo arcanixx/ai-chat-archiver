@@ -27,6 +27,7 @@ logs/
 # Temporary files
 tmp/
 docs/html_examples/
+docs/OtherExtensions/
 
 # Chromium extension artifacts
 public/icons/*.png

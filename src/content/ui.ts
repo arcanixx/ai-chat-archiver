@@ -37,15 +37,15 @@ export async function injectFloatingButton(onSave: () => void, onSaveSelection: 
   btn.style.justifyContent = "center";
   btn.style.width = "36px";
   btn.style.height = "36px";
-  btn.style.background = "transparent";
-  btn.style.border = "2px solid rgba(0,0,0,0.6)";
-  btn.style.borderRadius = "8px";
-  btn.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
+  btn.style.background = "rgba(30,30,30,0.85)";
+  btn.style.border = "2px solid rgba(255,255,255,0.3)";
+  btn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.4)";
   btn.style.right = "20px";
   btn.style.bottom = "20px";
   btn.style.color = "#fff";
   btn.style.cursor = "pointer";
-  btn.style.zIndex = "9999";
+  btn.style.zIndex = "2147483647";
+  btn.style.setProperty("z-index", "2147483647", "important");
   btn.setAttribute("draggable", "true");
   
   try {
@@ -64,6 +64,8 @@ export async function injectFloatingButton(onSave: () => void, onSaveSelection: 
     .ai-archiver-toast-ok { background: #4caf50; }
     .ai-archiver-toast-err { background: #f44336; }
     .ai-archiver-toast.show { opacity: 1; }
+    #ai-archiver-float-btn:hover { background: rgba(50,50,50,0.95) !important; transform: scale(1.05); }
+    #ai-archiver-float-btn.loading { opacity: 0.6; pointer-events: none; }
   `;
   document.head.appendChild(style);
   
