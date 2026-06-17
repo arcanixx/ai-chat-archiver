@@ -43,134 +43,134 @@
 <body>
   <h1 data-i18n="optionsTitle">AI Chat Archiver Settings</h1>
 
-  <h2>Storage</h2>
+  <h2 data-i18n="storageSection">Storage</h2>
   <div class="form-group">
-    <label>Folder (relative to Downloads):</label>
+    <label data-i18n="folderLabel">Folder (relative to Downloads):</label>
     <input type="text" id="folder" placeholder="AI-Chats">
   </div>
 
   <div class="form-group">
-    <label>Filename Template:</label>
+    <label data-i18n="filenameTemplateLabel">Filename Template:</label>
     <input type="text" id="filenameTemplate" placeholder="{title}__{provider}__{datetime}">
   </div>
 
-  <h2>General</h2>
+  <h2 data-i18n="generalSection">General</h2>
   <div class="form-group">
     <label class="checkbox-label">
-      <input type="checkbox" id="showFloatingButton"> Show floating save button on chat pages
+      <input type="checkbox" id="showFloatingButton"> <span data-i18n="showFloatingButtonLabel">Show floating save button on chat pages</span>
     </label>
   </div>
 
   <div class="form-group">
-    <label>Title prefix to ignore (for deduplication):</label>
+    <label data-i18n="titlePrefixLabel">Title prefix to ignore (for deduplication):</label>
     <input type="text" id="titlePrefixIgnore" placeholder="e.g. [OLD], [BLOCKED]">
-    <div class="hint">Comma-separated list of prefixes to ignore when deduplicating. E.g. "[OLD] Prism" and "Prism" are treated as the same chat.</div>
+    <div class="hint" data-i18n="titlePrefixHint">Comma-separated list of prefixes to ignore when deduplicating. E.g. "[OLD] Prism" and "Prism" are treated as the same chat.</div>
   </div>
 
   <div class="form-group">
-    <label>Export language:</label>
+    <label data-i18n="exportLanguageLabel">Export language:</label>
     <select id="language">
-      <option value="en">English</option>
-      <option value="pl">Polski</option>
+      <option value="en" data-i18n="langEnglish">English</option>
+      <option value="pl" data-i18n="langPolish">Polski</option>
     </select>
-    <div class="hint">Language for role labels and metadata in exported files.</div>
+    <div class="hint" data-i18n="exportLanguageHint">Language for role labels and metadata in exported files.</div>
   </div>
 
   <div class="form-group">
-    <label>Save history:</label>
-    <button id="clearHistory" style="background:#dc2626;">Clear save history</button>
-    <div class="hint">Removes deduplication cache. Previously saved conversations may be re-downloaded.</div>
+    <label data-i18n="saveHistoryLabel">Save history:</label>
+    <button id="clearHistory" style="background:#dc2626;" data-i18n="clearHistoryButton">Clear save history</button>
+    <div class="hint" data-i18n="clearHistoryHint">Removes deduplication cache. Previously saved conversations may be re-downloaded.</div>
   </div>
 
-  <h2>Export formats</h2>
+  <h2 data-i18n="exportFormatsSection">Export formats</h2>
   <div class="form-group">
-    <label class="checkbox-label"><input type="checkbox" id="fmt-md"> Markdown (.md)</label>
-    <label class="checkbox-label"><input type="checkbox" id="fmt-json"> JSON (.json)</label>
-    <label class="checkbox-label"><input type="checkbox" id="fmt-html"> HTML (.html)</label>
-    <label class="checkbox-label"><input type="checkbox" id="fmt-pdf"> PDF (.pdf)</label>
+    <label class="checkbox-label"><input type="checkbox" id="fmt-md"> <span data-i18n="fmtMd">Markdown (.md)</span></label>
+    <label class="checkbox-label"><input type="checkbox" id="fmt-json"> <span data-i18n="fmtJson">JSON (.json)</span></label>
+    <label class="checkbox-label"><input type="checkbox" id="fmt-html"> <span data-i18n="fmtHtml">HTML (.html)</span></label>
+    <label class="checkbox-label"><input type="checkbox" id="fmt-pdf"> <span data-i18n="fmtPdf">PDF (.pdf)</span></label>
   </div>
 
-  <h2>Bulk Export Settings</h2>
+  <h2 data-i18n="bulkExportSettingsSection">Bulk Export Settings</h2>
   <div class="form-group">
-    <label class="checkbox-label"><input type="checkbox" id="bulkSaveAttachments"> Save attachments with bulk export</label>
-    <div class="hint">When enabled, all attachments will be downloaded and included in the exported conversation.</div>
-  </div>
-
-  <div class="form-group">
-    <label class="checkbox-label"><input type="checkbox" id="bulkDownloadAttachments"> Download attachments separately</label>
-    <div class="hint">When enabled, attachments will be downloaded as individual files in addition to being included in the conversation.</div>
+    <label class="checkbox-label"><input type="checkbox" id="bulkSaveAttachments"> <span data-i18n="bulkSaveAttachmentsLabel">Save attachments with bulk export</span></label>
+    <div class="hint" data-i18n="bulkSaveAttachmentsHint">When enabled, all attachments will be downloaded and included in the exported conversation.</div>
   </div>
 
   <div class="form-group">
-    <label>Bulk export format:</label>
+    <label class="checkbox-label"><input type="checkbox" id="bulkDownloadAttachments"> <span data-i18n="bulkDownloadAttachmentsLabel">Download attachments separately</span></label>
+    <div class="hint" data-i18n="bulkDownloadAttachmentsHint">When enabled, attachments will be downloaded as individual files in addition to being included in the conversation.</div>
+  </div>
+
+  <div class="form-group">
+    <label data-i18n="bulkDefaultFormatLabel">Bulk export format:</label>
     <select id="bulkDefaultFormat">
-      <option value="md">Markdown (.md)</option>
-      <option value="txt">Plain Text (.txt)</option>
-      <option value="pdf">PDF (.pdf)</option>
+      <option value="md" data-i18n="formatMarkdown">Markdown (.md)</option>
+      <option value="txt" data-i18n="formatText">Plain Text (.txt)</option>
+      <option value="pdf" data-i18n="formatPDF">PDF (.pdf)</option>
     </select>
-    <div class="hint">Default format for bulk exports. Can be overridden in the bulk export popup.</div>
+    <div class="hint" data-i18n="bulkDefaultFormatHint">Default format for bulk exports. Can be overridden in the bulk export popup.</div>
   </div>
 
-  <h2>Keyboard Shortcuts</h2>
+  <h2 data-i18n="shortcutsSection">Keyboard Shortcuts</h2>
   <div class="form-group">
-    <p style="margin: 0 0 8px; color: #6b7280; font-size: 13px;">
+    <p style="margin: 0 0 8px; color: #6b7280; font-size: 13px;" data-i18n="shortcutsDescription">
       Current shortcuts (defaults). To customize, use Chrome's shortcut manager.
     </p>
     <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
       <tr style="border-bottom: 1px solid #e5e7eb;">
-        <td style="padding: 6px 0; font-weight: 500;">Save conversation</td>
+        <td style="padding: 6px 0; font-weight: 500;" data-i18n="shortcutSaveConv">Save conversation</td>
         <td style="padding: 6px 0; text-align: right;"><code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">Ctrl+Shift+S</code></td>
       </tr>
       <tr style="border-bottom: 1px solid #e5e7eb;">
-        <td style="padding: 6px 0; font-weight: 500;">Save selection</td>
+        <td style="padding: 6px 0; font-weight: 500;" data-i18n="shortcutSaveSel">Save selection</td>
         <td style="padding: 6px 0; text-align: right;"><code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">Ctrl+Shift+X</code></td>
       </tr>
       <tr>
-        <td style="padding: 6px 0; font-weight: 500;">Open batch dialog</td>
+        <td style="padding: 6px 0; font-weight: 500;" data-i18n="shortcutOpenBatch">Open batch dialog</td>
         <td style="padding: 6px 0; text-align: right;"><code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">Ctrl+Shift+B</code></td>
       </tr>
     </table>
-    <button id="openShortcuts" style="margin-top: 12px; font-size: 13px; padding: 6px 12px; background: #6b7280;">Change shortcuts...</button>
-    <div class="hint">Opens Chrome's extension shortcuts page where you can reassign keys.</div>
+    <button id="openShortcuts" style="margin-top: 12px; font-size: 13px; padding: 6px 12px; background: #6b7280;" data-i18n="changeShortcutsButton">Change shortcuts...</button>
+    <div class="hint" data-i18n="shortcutsHint">Opens Chrome's extension shortcuts page where you can reassign keys.</div>
   </div>
 
-  <h2>AI Providers</h2>
+  <h2 data-i18n="providersSection">AI Providers</h2>
   <div class="form-group">
-    <label class="checkbox-label"><input type="checkbox" id="prov-claude"> Claude</label>
-    <label class="checkbox-label"><input type="checkbox" id="prov-chatgpt"> ChatGPT</label>
-    <label class="checkbox-label"><input type="checkbox" id="prov-gemini"> Gemini</label>
-    <label class="checkbox-label"><input type="checkbox" id="prov-deepseek"> DeepSeek</label>
-    <label class="checkbox-label"><input type="checkbox" id="prov-kimi"> Kimi</label>
-    <label class="checkbox-label"><input type="checkbox" id="prov-grok"> Grok</label>
-    <label class="checkbox-label"><input type="checkbox" id="prov-copilot"> Copilot</label>
+    <label class="checkbox-label"><input type="checkbox" id="prov-claude"> <span data-i18n="providerClaude">Claude</span></label>
+    <label class="checkbox-label"><input type="checkbox" id="prov-chatgpt"> <span data-i18n="providerChatGPT">ChatGPT</span></label>
+    <label class="checkbox-label"><input type="checkbox" id="prov-gemini"> <span data-i18n="providerGemini">Gemini</span></label>
+    <label class="checkbox-label"><input type="checkbox" id="prov-deepseek"> <span data-i18n="providerDeepSeek">DeepSeek</span></label>
+    <label class="checkbox-label"><input type="checkbox" id="prov-kimi"> <span data-i18n="providerKimi">Kimi</span></label>
+    <label class="checkbox-label"><input type="checkbox" id="prov-grok"> <span data-i18n="providerGrok">Grok</span></label>
+    <label class="checkbox-label"><input type="checkbox" id="prov-copilot"> <span data-i18n="providerCopilot">Copilot</span></label>
   </div>
 
-  <h2>Batch Processing</h2>
+  <h2 data-i18n="batchProcessingSection">Batch Processing</h2>
   <div class="batch-section">
     <div class="form-group">
-      <label>URLs to process (one per line):</label>
+      <label data-i18n="batchUrlsLabel">URLs to process (one per line):</label>
       <textarea id="batchUrls" class="batch-urls" placeholder="https://claude.ai/chat/abc123
 https://chatgpt.com/c/def456
 https://gemini.google.com/app/ghi789"></textarea>
-      <div class="hint">Paste conversation URLs from supported providers. Each URL on a new line.</div>
+      <div class="hint" data-i18n="batchUrlsHint">Paste conversation URLs from supported providers. Each URL on a new line.</div>
       <div id="batchValidationError" class="validation-error"></div>
     </div>
     
     <div class="form-group">
-      <label>Concurrency (parallel downloads):</label>
+      <label data-i18n="batchConcurrencyLabel">Concurrency (parallel downloads):</label>
       <input type="number" id="batchConcurrency" value="2" min="1" max="5" style="width: 80px;">
-      <div class="hint">How many conversations to process simultaneously. Higher = faster but more load on sites.</div>
+      <div class="hint" data-i18n="batchConcurrencyHint">How many conversations to process simultaneously. Higher = faster but more load on sites.</div>
     </div>
 
     <div class="button-group">
-      <button id="batchValidate">Validate URLs</button>
-      <button id="batchStart">Start Batch</button>
+      <button id="batchValidate" data-i18n="batchValidateButton">Validate URLs</button>
+      <button id="batchStart" data-i18n="batchStartButton">Start Batch</button>
     </div>
     
     <div class="button-group" style="margin-top: 8px;">
-      <button id="batchPause" disabled>Pause</button>
-      <button id="batchResume" disabled>Resume</button>
-      <button id="batchCancel" disabled>Cancel</button>
+      <button id="batchPause" disabled data-i18n="batchPauseButton">Pause</button>
+      <button id="batchResume" disabled data-i18n="batchResumeButton">Resume</button>
+      <button id="batchCancel" disabled data-i18n="batchCancelButton">Cancel</button>
     </div>
 
     <div class="progress-container" id="batchProgress" style="display: none;">
@@ -186,7 +186,7 @@ https://gemini.google.com/app/ghi789"></textarea>
     <div class="batch-results" id="batchResults"></div>
   </div>
 
-  <button id="save">Save Settings</button>
+  <button id="save" data-i18n="saveSettingsButton">Save Settings</button>
   <div id="status"></div>
 
   <script type="module" src="./options.ts"></script>

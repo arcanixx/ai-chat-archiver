@@ -1,10 +1,10 @@
 import { adapterFor } from "../adapters";
-import { extractDomConversationList } from "../adapters/base";
+import { extractDomConversationList, nodeToParts } from "../adapters/base";
 import { toast, injectFloatingButton } from "./ui";
 import { repairFences } from "../core/fence";
 import { logger } from "../core/logger";
 import { appendAttachmentNotes, extractAttachmentsFromDocument, mergeAttachments } from "../core/attachments";
-import type { Attachment, Conversation, ExportFormat, RuntimeMessage } from "../core/types";
+import type { Attachment, Conversation, ExportFormat, Part, RuntimeMessage } from "../core/types";
 
 export { buildConversation, handleSaveConversation, saveSelection };
 
@@ -114,6 +114,25 @@ async function buildConversation(): Promise<Conversation> {
   }
 
   try {
+    // Convert image Parts to attachment Parts for images that are in the attachments list
+    // (attachments will be saved as files, not embedded inline)
+    if (conv.attachments?.length) {
+      const attMap = new Map(conv.attachments.map((a) => [a.url, a]));
+      for (const m of conv.messages) {
+        for (let i = 0; i < m.parts.length; i++) {
+          const p = m.parts[i];
+          if (p.type === "image" && attMap.has(p.src)) {
+            const att = attMap.get(p.src)!;
+            m.parts[i] = { type: "attachment", name: att.name, mime: att.mime, url: p.src };
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    logger.warn("Failed to convert image Parts to attachment Parts", { error: e.message });
+  }
+
+  try {
     appendAttachmentNotes(conv.messages, conv.attachments || []);
   } catch (e: any) {
     logger.warn("Failed to append attachment notes", { error: e.message });
@@ -180,6 +199,18 @@ function detectLangFromText(text: string): string | undefined {
   return undefined;
 }
 
+function detectProviderName(): string {
+  const u = location.hostname;
+  if (u.includes("claude")) return "Claude";
+  if (u.includes("chatgpt") || u.includes("chat.openai")) return "ChatGPT";
+  if (u.includes("gemini")) return "Gemini";
+  if (u.includes("deepseek")) return "DeepSeek";
+  if (u.includes("kimi")) return "Kimi";
+  if (u.includes("grok") || u.includes("x.ai")) return "Grok";
+  if (u.includes("copilot") || u.includes("bing")) return "Copilot";
+  return "Chat";
+}
+
 async function saveSelection() {
   if (saveInProgress) {
     logger.debug("Save already in progress, skipping");
@@ -211,25 +242,70 @@ async function saveSelection() {
       hasMarkdown
     });
 
-    // Auto-generate filename instead of prompting (prompt can be blocked)
-    const filename = `snippet-${Date.now()}`;
+    // Prompt user for a snippet name with provider pre-filled
+    const providerName = detectProviderName();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    let userLabel = window.prompt(`Name this snippet (${providerName}):`, "");
+    let filename: string;
+    if (userLabel === null) {
+      filename = `${providerName}-snippet-${timestamp}`;
+    } else {
+      userLabel = userLabel.trim();
+      if (userLabel) {
+        filename = `${providerName}-${userLabel}-${timestamp}`;
+      } else {
+        filename = `${providerName}-${timestamp}`;
+      }
+    }
+    filename = filename.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^_+|_+$/g, "") || `snippet-${Date.now()}`;
 
     logger.debug("Filename determined", { filename });
 
-    // Build a proper Markdown document
+    // Build snippet from selection HTML (preserves formatting)
     const sourceUrl = location.href;
     const capturedAt = new Date().toLocaleString();
     let snippet: string;
+
     if (lang) {
       snippet =
         `# Code Snippet\n\n` +
         `> Source: ${sourceUrl}  \n> Captured: ${capturedAt}\n\n` +
         `\`\`\`${lang}\n${text}\n\`\`\``;
     } else {
-      snippet =
-        `# Text Snippet\n\n` +
-        `> Source: ${sourceUrl}  \n> Captured: ${capturedAt}\n\n` +
-        `${text}`;
+      // Try to get formatted selection via DOM
+      try {
+        const range = selection.getRangeAt(0);
+        const fragment = range.cloneContents();
+        const tempDiv = document.createElement("div");
+        tempDiv.appendChild(fragment);
+        const parts: Part[] = nodeToParts(tempDiv);
+        const isPlain = parts.length === 1 && parts[0]?.type === "text";
+        const plainMd = isPlain ? (parts[0] as { type: "text"; markdown: string }).markdown : "";
+        if (isPlain && plainMd === text.trim()) {
+          // No formatting — use plain text
+          snippet =
+            `# Text Snippet\n\n` +
+            `> Source: ${sourceUrl}  \n> Captured: ${capturedAt}\n\n` +
+            `${text}`;
+        } else {
+          const formatted = parts.map((p) => {
+            if (p.type === "text") return p.markdown;
+            if (p.type === "code") return "```" + (p.lang || "") + "\n" + p.code + "\n```";
+            if (p.type === "image") return "![" + (p.alt || "") + "](" + p.src + ")";
+            return "";
+          }).filter(Boolean).join("\n\n");
+          snippet =
+            `# Snippet\n\n` +
+            `> Source: ${sourceUrl}  \n> Captured: ${capturedAt}\n\n` +
+            `${formatted}`;
+        }
+      } catch {
+        // Fallback to plain text
+        snippet =
+          `# Text Snippet\n\n` +
+          `> Source: ${sourceUrl}  \n> Captured: ${capturedAt}\n\n` +
+          `${text}`;
+      }
     }
 
     logger.debug("Snippet built", { length: snippet.length });
@@ -522,9 +598,19 @@ try {
   logger.error("Failed to install history override", { error: e.message });
 }
 
+async function initFloatingButton() {
+  try {
+    await maybeInject();
+  } catch (e: any) {
+    logger.error("Failed to inject floating button", { error: e.message });
+  }
+  // Retry after 2s for pages with dynamic/lazy content
+  setTimeout(() => maybeInject().catch(() => {}), 2000);
+}
+
 try {
   logger.debug("Initial injection attempt");
-  maybeInject();
+  initFloatingButton();
 } catch (e: any) {
-  logger.error("Failed to inject floating button initially", { error: e.message });
+  logger.error("Failed to start floating button injection", { error: e.message });
 }

@@ -110,7 +110,7 @@ export function extractAttachmentsFromElement(el: Element): Attachment[] {
     const href = link.href || link.getAttribute("href") || "";
     if (!href || href.startsWith("#")) continue;
     const text = link.textContent?.trim() || link.getAttribute("download") || link.getAttribute("title") || "";
-    if (!link.hasAttribute("download") && !/attachment|file|download|\.(pdf|docx?|xlsx?|pptx?|txt|md|json|xml|zip|rar|7z|png|jpe?g|gif|webp|svg|mp4|webm|mp3|wav)$/i.test(href)) continue;
+    if (!link.hasAttribute("download") && !/\/(attachment|file|download)s?(\/|[\?#])|\.(pdf|docx?|xlsx?|pptx?|txt|md|json|xml|zip|rar|7z|png|jpe?g|gif|webp|svg|mp4|webm|mp3|wav)$/i.test(href)) continue;
     add({
       name: sanitizeFilename(text || `file-${attachments.length + 1}`, `file-${attachments.length + 1}`),
       url: href,

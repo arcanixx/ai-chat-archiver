@@ -1,14 +1,9 @@
 import { getSettings, saveSettings } from "../core/settings";
+import { applyI18n } from "../core/i18n-helper";
 import type { ExportFormat, ProviderId } from "../core/types";
 
 document.addEventListener("DOMContentLoaded", async () => {
-  document.querySelectorAll("[data-i18n]").forEach((el) => {
-    const key = el.getAttribute("data-i18n");
-    if (key) {
-      const msg = chrome.i18n.getMessage(key);
-      if (msg) el.textContent = msg;
-    }
-  });
+  await applyI18n();
 
   const folderEl = document.getElementById("folder") as HTMLInputElement;
   const templateEl = document.getElementById("filenameTemplate") as HTMLInputElement;
@@ -326,6 +321,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       downloadAttachments: bulkDownloadAttachmentsEl.checked,
       bulkDefaultFormat: bulkDefaultFormatEl.value as "md" | "txt" | "pdf",
     } as any);
+
+    await applyI18n();
 
     const status = document.getElementById("status");
     if (status) {

@@ -1,4 +1,4 @@
-import { expandUntilStable, nodeToParts, readTimestamp, type ProviderAdapter } from "./base";
+import { expandUntilStable, nodeToParts, readTimestamp, sleep, type ProviderAdapter } from "./base";
 import { extractAttachmentsFromDocument } from "../core/attachments";
 import type { Message } from "../core/types";
 
@@ -18,18 +18,38 @@ export const deepseekAdapter: ProviderAdapter = {
   },
   
   async expandAll(doc) {
-    const main = doc.querySelector("main") ?? doc.scrollingElement ?? doc.body;
-    for (let i = 0; i < 8; i++) {
-      main.scrollTop = main.scrollHeight;
-      await new Promise((r) => setTimeout(r, 800));
-      const loadMoreBtn = Array.from(doc.querySelectorAll<HTMLElement>("button")).find((btn) => {
+    const scrollTargets = () => [
+      doc.querySelector("main"),
+      doc.scrollingElement,
+      doc.body,
+      doc.querySelector('.ds-conversation'),
+      doc.querySelector('[class*="messages"]'),
+      doc.querySelector('[class*="chat"]'),
+      doc.querySelector('[class*="scroll"]'),
+      doc.querySelector('[class*="conversation"]'),
+    ].filter(Boolean) as Element[];
+
+    let prevCount = 0;
+    for (let i = 0; i < 20; i++) {
+      for (const el of scrollTargets()) {
+        try { el.scrollTop = 0; await sleep(200); el.scrollTop = el.scrollHeight; } catch {}
+      }
+      await sleep(400);
+
+      const loadMoreBtn = Array.from(doc.querySelectorAll<HTMLElement>("button, a, [role='button']")).find((btn) => {
         const txt = btn.textContent?.trim().toLowerCase() || "";
-        return txt.includes("load more") || txt.includes("show earlier") || txt.includes("更多") || txt.includes("加载更多");
+        return txt.includes("load more") || txt.includes("show earlier") || txt.includes("load earlier") ||
+               txt.includes("więcej") || txt.includes("pokaż więcej") || txt.includes("wyświetl") ||
+               txt.includes("更多") || txt.includes("加载更多") || txt.includes("显示更早");
       });
       if (loadMoreBtn) {
         loadMoreBtn.click();
-        await new Promise((r) => setTimeout(r, 1000));
+        await sleep(1500);
       }
+
+      const msgCount = doc.querySelectorAll(".ds-message").length;
+      if (i > 2 && msgCount === prevCount) break;
+      prevCount = msgCount;
     }
     await expandUntilStable(doc, [
       'div[class*="thinking"] button',

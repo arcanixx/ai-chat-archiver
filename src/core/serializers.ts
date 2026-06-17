@@ -47,7 +47,7 @@ function partToMd(p: Part): string {
     case "image":
       return `![${p.alt ?? ""}](${p.src})`;
     case "attachment":
-      return `📎 **Attachment:** ${p.name}${p.mime ? ` (${p.mime})` : ""}`;
+      return `📎 **Attachment:** [${p.name}](${p.url || "#"})${p.mime ? ` (${p.mime})` : ""}`;
     case "artifact": {
       const head = `**📄 Artifact:** ${p.title}${p.lang ? ` (${p.lang})` : ""}${p.href ? ` — [open](${p.href})` : ""}`;
       if (p.code) {
@@ -107,7 +107,7 @@ function partToHtml(p: Part): string {
     case "image":
       return `<img src="${escapeHtml(p.src)}" alt="${escapeHtml(p.alt ?? "")}" loading="lazy">`;
     case "attachment":
-      return `<p class="attachment">📎 <b>Attachment:</b> ${escapeHtml(p.name)}${p.mime ? ` (${escapeHtml(p.mime)})` : ""}</p>`;
+      return `<p class="attachment">📎 <b>Attachment:</b> <a href="${escapeHtml(p.url || "#")}">${escapeHtml(p.name)}</a>${p.mime ? ` (${escapeHtml(p.mime)})` : ""}</p>`;
     case "artifact":
       return `<section class="artifact"><h3>📄 ${escapeHtml(p.title)}${p.lang ? ` <span class="lang">${escapeHtml(p.lang)}</span>` : ""}${p.href ? ` <a href="${escapeHtml(p.href)}">↗</a>` : ""}</h3>${p.code ? `<pre><code class="language-${escapeHtml(p.lang ?? "")}">${escapeHtml(p.code)}</code></pre>` : `<p class="muted"><em>Artifact body not captured.</em></p>`}</section>`;
   }

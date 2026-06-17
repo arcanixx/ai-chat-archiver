@@ -1,14 +1,8 @@
 import type { RuntimeMessage } from "../core/types";
+import { applyI18n } from "../core/i18n-helper";
 
-document.addEventListener("DOMContentLoaded", () => {
-  // Initialize i18n
-  document.querySelectorAll("[data-i18n]").forEach((el) => {
-    const key = el.getAttribute("data-i18n");
-    if (key) {
-      const msg = chrome.i18n.getMessage(key);
-      if (msg) el.textContent = msg;
-    }
-  });
+document.addEventListener("DOMContentLoaded", async () => {
+  await applyI18n();
 
   // DOM elements
   const formatSelect = document.getElementById("format-select") as HTMLSelectElement;
@@ -115,10 +109,9 @@ document.addEventListener("DOMContentLoaded", () => {
     window.close();
   });
 
-  btnBack.addEventListener("click", () => {
-    // Send message to main popup to show the main interface
-    chrome.runtime.sendMessage({ kind: "show-main-popup" } as RuntimeMessage);
-    window.close();
+  btnBack.addEventListener("click", async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) chrome.tabs.remove(tab.id);
   });
 
   // Listen for messages from background/content scripts

@@ -54,7 +54,12 @@ async function fetchAttachment(url: string): Promise<Blob> {
 async function saveAttachment(blob: Blob, filename: string, folder: string): Promise<string> {
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^_+|_+$/g, "") || "attachment";
   const fullPath = `${folder.replace(/\/+$/, "")}/${safeFilename}`;
-  const url = URL.createObjectURL(blob);
+  let url: string;
+  try {
+    url = URL.createObjectURL(blob);
+  } catch {
+    url = await blobToDataUrl(blob);
+  }
   try {
     await chrome.downloads.download({
       url,
@@ -66,7 +71,7 @@ async function saveAttachment(blob: Blob, filename: string, folder: string): Pro
     logger.error("Failed to save attachment", err);
     throw err;
   } finally {
-    URL.revokeObjectURL(url);
+    try { URL.revokeObjectURL(url); } catch { /* ignore */ }
   }
 
   return fullPath;
@@ -74,7 +79,9 @@ async function saveAttachment(blob: Blob, filename: string, folder: string): Pro
 
 async function saveConversationAttachments(conv: Conversation, settings: any): Promise<void> {
   if ((!settings.saveAttachments && !settings.downloadAttachments) || !conv.attachments?.length) return;
-  const folder = settings.attachmentsFolder || "attachments";
+  const titleSlug = conv.title.replace(/[^a-zA-Z0-9_-]/g, "_").replace(/^_+|_+$/g, "").slice(0, 50) || "conversation";
+  const baseFolder = settings.folder || "AI-Chats";
+  const folder = `${baseFolder}/${titleSlug}`;
 
   for (const att of conv.attachments) {
     try {
@@ -135,14 +142,19 @@ async function extractConversationFromUrl(url: string, provider: ProviderId): Pr
   
   try {
     await new Promise<void>((resolve, reject) => {
+      let loaded = false;
       const listener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
-        if (tabId === tab.id && changeInfo.status === "complete") {
+        if (tabId === tab.id && changeInfo.status === "complete" && !loaded) {
+          loaded = true;
           chrome.tabs.onUpdated.removeListener(listener);
-          setTimeout(resolve, 2000);
+          // Wait longer for SPA to hydrate and render
+          setTimeout(resolve, 5000);
         }
       };
       chrome.tabs.onUpdated.addListener(listener);
-      setTimeout(() => reject(new Error("Tab load timeout")), 30000);
+      setTimeout(() => {
+        if (!loaded) reject(new Error("Tab load timeout"));
+      }, 45000);
     });
     return extractConversationFromTab(tab.id, provider);
   } finally {
@@ -349,6 +361,21 @@ batchProcessor.onJobUpdate((job) => {
   }
 });
 
+chrome.runtime.onInstalled.addListener(async () => {
+  // Check if keyboard shortcuts are assigned; if not, log a warning
+  const commands = await chrome.commands.getAll();
+  for (const cmd of commands) {
+    if (cmd.name && cmd.shortcut === "") {
+      logger.warn(`Shortcut "${cmd.name}" not assigned — tell user to set it at chrome://extensions/shortcuts`);
+    }
+  }
+  // Set default settings if not present
+  const existing = await chrome.storage.sync.get("language");
+  if (!existing.language) {
+    await chrome.storage.sync.set({ language: "en" });
+  }
+});
+
 chrome.commands.onCommand.addListener(async (cmd) => {
   if (cmd === "save-now") {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -361,6 +388,7 @@ chrome.commands.onCommand.addListener(async (cmd) => {
       chrome.tabs.sendMessage(tabs[0].id, { kind: "save-selection" });
     }
   } else if (cmd === "open-batch") {
-    chrome.runtime.openOptionsPage();
+    const url = chrome.runtime.getURL("src/bulk/bulk-popup.html");
+    chrome.tabs.create({ url });
   }
 });

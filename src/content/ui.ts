@@ -48,6 +48,11 @@ export function toast(text: string, kind: "ok" | "err" = "ok") {
 export async function injectFloatingButton(onSave: () => void, onSaveSelection: () => void) {
   const FLOAT_BTN_ID = "ai-archiver-float-btn";
   if (document.getElementById(FLOAT_BTN_ID)) return;
+  if (!document.body) {
+    // Body not ready yet — retry shortly
+    setTimeout(() => injectFloatingButton(onSave, onSaveSelection), 300);
+    return;
+  }
   
   const btn = document.createElement("button");
   btn.id = FLOAT_BTN_ID;

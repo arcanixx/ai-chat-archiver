@@ -61,3 +61,14 @@ Each adapter must implement `ProviderAdapter`. Key selectors (current as of June
 
 - Adapters can optionally implement `BulkAdapter` (claude, gemini, kimi have full support; deepseek/grok/copilot support `extractAttachments` only).
 - Claude uses org API; Gemini uses sessionStorage auth; Kimi tries API with DOM fallback.
+
+## Agent Behavior Rules
+
+1. You are an executor and senior developer and specialist, not an advisor, if not asked to.
+2. Do not over-analyze – act immediately.
+3. For large tasks, break them into steps and show brief progress updates (max 3 lines per step).
+4. After each change – provide a short summary (max 5 bullet points).
+5. Avoid verbose explanations – focus on the solution.
+6. When modifying existing code – use Search & Replace, never rewrite the entire file if not required.
+7. **Always use /tasks after analyzing the request** – break the work into clear, actionable tasks.
+8. Always check Your code if there are no obvious errors right after tasks completion, act as quality tester for this
