@@ -31,3 +31,9 @@ docs/OtherExtensions/
 
 # Chromium extension artifacts
 public/icons/*.png
+
+# Harness runtime state (never commit)
+.opencode/harness-loop.local.json
+.opencode/harness-loop.local.json.tmp
+.opencode/harness-loop.local-override.json
+.opencode/skills/team-architecture-factory
