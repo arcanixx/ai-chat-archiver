@@ -195,6 +195,10 @@ describe('MyProvider Adapter', () => {
 5. **UI chrome filtering**: Use `isUiChrome()` or `filterUiChromeParts()` to exclude edit/copy/share buttons
 6. **expandAll safety**: Limit iterations (max 8 in `expandUntilStable`), check HTML length stability
 7. **Timestamp extraction**: Adapters should look for `<time datetime="...">` and use `readTimestamp()` from base
+8. **Virtual scroll handling** (e.g. DeepSeek): Use staged incremental scrolling — divide container height into N stages proportional to `maxKey`, scroll step-by-step with snapshots at each position, then do a targeted fill pass for any remaining missing keys. Never scroll directly to bottom and expect all keys to be captured.
+9. **Language-label code-fold expansion** (Claude, Kimi): Add a second pass that clicks buttons with short single-word text matching `/^[a-zA-Z][\w#+.]{0,20}$/` (e.g. "Script", "Python", "JavaScript") to expand hidden code blocks. Skip UI labels via `skipLabels` and scope to `<main>`.
+10. **Icon-cache URL filtering** (Kimi): Filter `extractAttachmentsFromElement` results using a regex like `/icon-cache|kimi-web-img\.moonshot\.cn\/prod-data/` to exclude favicon/icon images from CDN URLs that are not real attachments.
+11. **expandAll selector scoping** (Claude): Scope broad selectors (`button[aria-expanded="false"]`) to `<main>` to avoid expanding sidebar/nav/header UI chrome, while keeping specific aria-label selectors unscoped for targeted expansion. Always expand artifact sidebars in a separate pass.
 
 ## Shared Utilities in `src/adapters/base.ts`
 

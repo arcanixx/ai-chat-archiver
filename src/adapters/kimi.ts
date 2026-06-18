@@ -158,7 +158,19 @@ export const kimiAdapter: ProviderAdapter = {
       'div[class*="reason"] button',
       'button[class*="expand"]',
       '[class*="collapse"] button',
+      '[class*="code-execution"] button',
+      '[class*="sandbox"] button',
+      '[class*="run-code"] button',
     ]);
+
+    // Expand code-fold buttons with language labels
+    for (const btn of doc.querySelectorAll<HTMLElement>('main button, [class*="message"] button, [class*="chat"] button')) {
+      const t = (btn.textContent || "").trim();
+      if (t.length > 0 && t.length < 25 && /^[a-zA-Z][\w#+.]{0,20}$/.test(t) &&
+          !/^(edit|copy|share|delete|remove|close|pin|mute|rename|archive|settings)$/i.test(t)) {
+        try { btn.click(); } catch {}
+      }
+    }
   },
   
   async extract(doc) {
@@ -190,7 +202,9 @@ export const kimiAdapter: ProviderAdapter = {
       const iframeParts = await extractIframeContent(el);
       parts.push(...iframeParts);
       
-      const msgAttachments = extractAttachmentsFromElement(el);
+      const msgAttachments = extractAttachmentsFromElement(el).filter(
+        (a) => !/icon-cache|kimi-web-img\.moonshot\.cn\/prod-data/.test(a.url)
+      );
       allAttachments.push(...msgAttachments);
       
       if (msgAttachments.length > 0) {

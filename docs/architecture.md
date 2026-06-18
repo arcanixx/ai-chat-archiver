@@ -83,11 +83,11 @@ AI Chat Archiver is a Chrome/Edge extension (Manifest V3) that saves AI conversa
 - **Base Interface**: `src/adapters/base.ts` - `ProviderAdapter` interface, shared utilities (`expandUntilStable`, `nodeToParts`, `readTimestamp`, `filterUiChromeParts`, `extractDomConversationList`)
 - **Registry**: `src/adapters/index.ts` - `adapterFor(url)` selects adapter by hostname matching
 - **Individual Adapters** (7 total):
-  - `claude.ts` — Titles from `[data-testid="chat-menu-trigger"]`, user messages from `[data-testid="user-message"]`, responses from `.font-claude-response`, artifacts with code extraction, thinking blocks via `button[aria-label*="Thinking"]`
+  - `claude.ts` — Titles from `[data-testid="chat-menu-trigger"]`, user messages from `[data-testid="user-message"]`, responses from `.font-claude-response`, artifacts with code extraction (3 strategies: data-testid, class heuristic, orphan pre/code), thinking blocks. expandAll scopes broad selectors to `<main>` to avoid UI chrome, with a separate artifact sidebar expansion pass and language-label code-fold toggle expansion (buttons with short single-word text like "Script"/"Python").
   - `chatgpt.ts` — Roles from `[data-message-author-role]`, content from `[data-message-content]` / `.markdown` / `.prose`, titles from `nav a[aria-current="page"]`
   - `gemini.ts` — `user-query` / `response-container` elements, `.markdown-main-panel` content, `code-block` language patching, `thinking-overlay` extraction
-  - `deepseek.ts` — `.ds-message` containers, `.ds-markdown.ds-assistant-message-main-content` for assistant, `[class*="thinking"]` / `[class*="reason"]` for thinking sections
-  - `kimi.ts` — `.chat-content-item-user` / `.chat-content-item-assistant` selectors, iframe content extraction, side panel content, attachment extraction
+  - `deepseek.ts` — `.ds-message` containers with virtual scroll handling. expandAll uses staged incremental scrolling: divides container height into N stages (proportional to maxKey), scrolls step-by-step with snapshots at each position, with a targeted fill pass for any remaining missing keys. Captures all messages even when virtual scroll unloads off-screen items.
+  - `kimi.ts` — `.chat-content-item-user` / `.chat-content-item-assistant` selectors, iframe content extraction, side panel content, attachment extraction with icon-cache URL filtering (excludes `kimi-web-img.moonshot.cn/prod-data/icon-cache-img/` URLs). expandAll handles code execution blocks (`[class*="code-execution"]`, `[class*="sandbox"]`, `[class*="run-code"]`) and language-label toggles.
   - `grok.ts` — `.message-row` / `[data-message-author-role]` selectors, role from attribute or className, `.prose` / `.markdown` content
   - `copilot.ts` — `cib-chat-turn` / `.chat-turn` elements, role from className or `data-role` attribute
 
@@ -200,8 +200,10 @@ Each format has a dedicated `toFormat(conversation)` function in `src/core/seria
 ```
 tests/
 ├── adapters/
-│   ├── claude.test.ts       # Claude adapter unit tests
-│   └── chatgpt.test.ts      # ChatGPT adapter unit tests
+│   ├── claude.test.ts        # Claude adapter unit tests
+│   ├── chatgpt.test.ts       # ChatGPT adapter unit tests
+│   ├── deepseek.test.ts      # DeepSeek adapter unit tests
+│   └── kimi.test.ts          # Kimi adapter unit tests (incl. icon-cache filtering)
 ├── attachments.test.ts       # Attachment extraction and dedup
 ├── bulk.test.ts              # Bulk data parsing and builder
 ├── filename.test.ts          # Slugify, uniqueness, collision handling

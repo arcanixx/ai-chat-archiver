@@ -72,3 +72,10 @@ Each adapter must implement `ProviderAdapter`. Key selectors (current as of June
 6. When modifying existing code – use Search & Replace, never rewrite the entire file if not required.
 7. **Always use /tasks after analyzing the request** – break the work into clear, actionable tasks.
 8. Always check Your code if there are no obvious errors right after tasks completion, act as quality tester for this
+
+## Backlog / Known Gaps
+
+- **DeepSeek Bulk Export**: `fetchList`/`fetchDetail`/`parseBulkData` not yet implemented. Need to verify if DeepSeek has a REST API and implement bulk support alongside DOM extraction. Current state: `supportsBulk: true` but only `extractAttachments` works.
+- **DeepSeek share pages** (`/share/...`): The floating button may not initialize correctly. Verify content script injection on share URLs and fix if needed.
+- **Floating Button icon**: Current icon is a black background with a floppy disk. Needs a nicer/polished SVG icon for the floating save button overlay.
+- **Adapter test coverage**: Only Claude, ChatGPT, DeepSeek, Kimi have test files. Gemini, Grok, Copilot still need basic adapter tests.

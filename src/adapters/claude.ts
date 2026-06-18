@@ -215,6 +215,7 @@ export const claudeAdapter: ProviderAdapter = {
   async expandAll(doc) {
     logger.debug("[ClaudeAdapter] expandAll start");
 
+    // Pass 1 — expand thinking, reasoning, show more by aria-label (safe, targeted)
     await expandUntilStable(doc, [
       'button[aria-label*="Thinking" i]',
       'button[aria-label*="Reasoning" i]',
@@ -222,32 +223,33 @@ export const claudeAdapter: ProviderAdapter = {
       'button[aria-label*="Show" i]',
       'button[aria-label*="Expand" i]',
       'button[aria-label*="Continue" i]',
-      'button[aria-expanded="false"][data-state]',
-      'button[aria-expanded="false"]',
       'details summary',
-      '[role="button"][aria-expanded="false"]',
     ]);
 
-    // Second pass — expand by text content, skip UI chrome
-    const skipAncestors = 'nav, header, [role="navigation"], [class*="sidebar"], [class*="Sidebar"], [class*="nav-"], [role="tablist"], aside, [class*="menu"], [data-testid="thread-tab"], [class*="panel-left"]';
-    const skipLabels = /^(edit|copy|share|delete|remove|close|pin|mute|rename|archive|settings|new chat|new conversation|view all|help|feedback|upgrade)$/i;
+    // Scroll to bottom repeatedly to load all messages
+    const scrollEl = doc.querySelector('[class*="chat-scroll"], [class*="conversation"], main') || doc.scrollingElement || doc.body;
+    for (let i = 0; i < 8; i++) {
+      try { scrollEl.scrollTop = scrollEl.scrollHeight; } catch {}
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    try { scrollEl.scrollTop = 0; } catch {}
+    await new Promise((r) => setTimeout(r, 300));
 
-    const allButtons = doc.querySelectorAll<HTMLElement>('button, [role="button"]');
-    for (const btn of allButtons) {
-      if (btn.closest(skipAncestors)) continue;
-      const text = (btn.textContent || "").toLowerCase().trim();
-      const label = (btn.getAttribute("aria-label") || "").toLowerCase();
-      if (skipLabels.test(text) || skipLabels.test(label)) continue;
-      const expanded = btn.getAttribute("aria-expanded");
-      if (
-        expanded === "false" ||
-        text.includes("thinking") ||
-        text.includes("reasoning") ||
-        label.includes("expand") ||
-        label.includes("show") ||
-        label.includes("continue")
-      ) {
-        try { btn.click(); } catch { /* ignore */ }
+    // Pass 2 — expand collapsed buttons only inside message elements (NOT artifact sidebar)
+    for (const msgEl of doc.querySelectorAll<HTMLElement>('.font-claude-response, [data-testid="user-message"]')) {
+      for (const btn of msgEl.querySelectorAll<HTMLElement>('button[aria-expanded="false"], [role="button"][aria-expanded="false"]')) {
+        try { btn.click(); } catch {}
+      }
+    }
+
+    // Pass 3 — expand code fold toggles (language labels) inside messages only
+    for (const msgEl of doc.querySelectorAll<HTMLElement>('.font-claude-response, [data-testid="user-message"]')) {
+      for (const btn of msgEl.querySelectorAll<HTMLElement>('button, [role="button"]')) {
+        const t = (btn.textContent || "").trim().toLowerCase();
+        if (t.length > 0 && t.length < 25 && /^[a-z][\w#+.]{0,20}$/.test(t) &&
+            !/^(edit|copy|share|delete|remove|close|pin|mute|rename|archive|settings)$/i.test(t)) {
+          try { btn.click(); } catch {}
+        }
       }
     }
 
