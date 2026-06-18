@@ -12,14 +12,14 @@ export const grokAdapter: ProviderAdapter = {
     return t || "Untitled conversation";
   },
   
-  async expandAll(doc) {
+  async expandAll(doc, _signal?: AbortSignal) {
     await expandUntilStable(doc, [
       'button[aria-label*="Show more" i]',
       'button[aria-expanded="false"]'
     ]);
   },
   
-  extract(doc) {
+  async extract(doc) {
     const messages: Message[] = [];
     const turns = Array.from(doc.querySelectorAll(".message-row, [data-message-author-role]"));
     

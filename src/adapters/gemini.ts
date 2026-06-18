@@ -12,7 +12,7 @@ export const geminiAdapter: ProviderAdapter = {
     return raw.replace(/\s*[-–|]\s*Google Gemini.*$/i, "").trim() || "Untitled conversation";
   },
   
-  async expandAll(doc) {
+  async expandAll(doc, _signal?: AbortSignal) {
     await expandUntilStable(doc, [
       '[data-test-id="expandable-section-toggle"][aria-expanded="false"]',
       'button[aria-label*="Show" i]',
@@ -21,7 +21,7 @@ export const geminiAdapter: ProviderAdapter = {
     ]);
   },
   
-  extract(doc) {
+  async extract(doc) {
     const messages: Message[] = [];
     const turns = [
       ...Array.from(doc.querySelectorAll("user-query")).map((el) => ({ role: "user" as const, el })),
@@ -164,9 +164,20 @@ export const geminiAdapter: ProviderAdapter = {
   },
 };
 
+// Module-level cache for credentials from hook injection
+let _hookCredentials: { sid: string; at: string } | null = null;
+
+/** Called by content script when hook-credentials.js captures auth tokens */
+export function setGeminiHookCredentials(creds: { sid: string; at: string } | null) {
+  _hookCredentials = creds;
+}
+
 function getGeminiAuthToken(doc: Document): { sid: string; at: string } | null {
+  // Priority 1: hook-injected credentials (most reliable, from intercepting fetch)
+  if (_hookCredentials?.sid) return _hookCredentials;
+
   try {
-    // Read credentials from page's sessionStorage (set by Gemini when authenticated)
+    // Priority 2: sessionStorage (set by Gemini when authenticated)
     const raw = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("geminiauth") : null;
     if (raw) {
       try {
@@ -176,7 +187,7 @@ function getGeminiAuthToken(doc: Document): { sid: string; at: string } | null {
         }
       } catch { /* ignore parse failure */ }
     }
-    // Fallback: try to extract from page meta tags or cookies
+    // Priority 3: try to extract from page meta tags or cookies
     const meta = doc.querySelector('meta[name="g-token"]');
     if (meta?.getAttribute("content")) {
       return { sid: meta.getAttribute("content") || "", at: "" };

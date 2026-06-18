@@ -36,7 +36,7 @@ export const deepseekAdapter: ProviderAdapter = {
     return "Untitled conversation";
   },
 
-  async expandAll(doc) {
+  async expandAll(doc, signal?: AbortSignal) {
     virtualScrollCache = null;
 
     await expandUntilStable(doc, [
@@ -50,11 +50,17 @@ export const deepseekAdapter: ProviderAdapter = {
                       doc.scrollingElement;
     if (!container) return;
 
-    // Step 1: scroll to bottom to find maxKey and trigger lazy load
-    for (let i = 0; i < 15; i++) {
+    // Step 1: quick scroll to bottom to trigger lazy load and find maxKey
+    for (let i = 0; i < 3; i++) {
+      signal?.throwIfAborted();
       try { container.scrollTop = container.scrollHeight; } catch {}
-      await sleep(400);
+      await sleep(200);
     }
+
+    // Ensure we're at top before the staging pass
+    signal?.throwIfAborted();
+    try { container.scrollTop = 0; } catch {}
+    await sleep(200);
 
     const allKeyEls = doc.querySelectorAll('[data-virtual-list-item-key]');
     const keys = Array.from(allKeyEls)
@@ -64,7 +70,7 @@ export const deepseekAdapter: ProviderAdapter = {
     const maxKey = keys.length > 0 ? Math.max(...keys) : 0;
     if (maxKey === 0) return;
 
-    // Step 2: collect messages by key — staged scrolling from top to bottom
+    // Step 2: single pass — stage scroll from top to bottom, capture in each stage
     const seenKeys = new Set<number>();
     const msgByKey = new Map<number, Message>();
 
@@ -87,33 +93,25 @@ export const deepseekAdapter: ProviderAdapter = {
       }
     };
 
-    // Scroll incrementally in stages — each stage reveals a new batch of keys
     const totalHeight = container.scrollHeight || 1;
-    const numStages = Math.min(Math.max(Math.ceil(maxKey / 3), 3), 30);
+    const numStages = Math.min(Math.max(Math.ceil(maxKey / 5), 3), 40);
     const stageSize = totalHeight / numStages;
 
+    // Start from top (stage 0 = top), go down to bottom — check signal between stages
     for (let stage = 0; stage <= numStages; stage++) {
+      signal?.throwIfAborted();
       try { container.scrollTop = Math.min(stage * stageSize, container.scrollHeight); } catch {}
-      await sleep(500);
+      await sleep(300);
       snapshot();
       if (seenKeys.size >= maxKey) break;
     }
 
-    // Final snapshot at the very bottom
-    try { container.scrollTop = container.scrollHeight; } catch {}
-    await sleep(500);
-    snapshot();
-
-    // Targeted fill — if still missing keys, seek each missing key by proportional position
+    // Final snapshot at bottom (in case virtual list load is async)
     if (seenKeys.size < maxKey) {
-      for (let key = 1; key <= maxKey; key++) {
-        if (seenKeys.has(key)) continue;
-        const target = (key / maxKey) * container.scrollHeight;
-        try { container.scrollTop = target; } catch {}
-        await sleep(300);
-        snapshot();
-        if (seenKeys.size >= maxKey) break;
-      }
+      signal?.throwIfAborted();
+      try { container.scrollTop = container.scrollHeight; } catch {}
+      await sleep(300);
+      snapshot();
     }
 
     if (msgByKey.size > 0) {
@@ -125,7 +123,7 @@ export const deepseekAdapter: ProviderAdapter = {
     }
   },
 
-  extract(doc) {
+  async extract(doc) {
     if (virtualScrollCache) {
       const cache = virtualScrollCache;
       virtualScrollCache = null;

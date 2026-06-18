@@ -12,13 +12,13 @@ export const copilotAdapter: ProviderAdapter = {
     return t || "Untitled conversation";
   },
   
-  async expandAll(doc) {
+  async expandAll(doc, _signal?: AbortSignal) {
     await expandUntilStable(doc, [
       'button[aria-expanded="false"]'
     ]);
   },
   
-  extract(doc) {
+  async extract(doc) {
     const messages: Message[] = [];
     const turns = Array.from(doc.querySelectorAll("cib-chat-turn, .chat-turn"));
     

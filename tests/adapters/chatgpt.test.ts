@@ -36,9 +36,9 @@ describe('ChatGPT Adapter', () => {
   });
 
   describe('extract', () => {
-    it('should return empty array for empty document', () => {
+    it('should return empty array for empty document', async () => {
       const doc = { querySelectorAll: () => [], title: '', querySelector: () => null } as any;
-      const result = chatgptAdapter.extract(doc) as any[];
+      const result = await chatgptAdapter.extract(doc) as any[];
       expect(Array.isArray(result)).toBe(true);
       expect(result).toHaveLength(0);
     });

@@ -15,14 +15,14 @@ export const chatgptAdapter: ProviderAdapter = {
     );
   },
   
-  async expandAll(doc) {
+  async expandAll(doc, _signal?: AbortSignal) {
     await expandUntilStable(doc, [
       'button[aria-expanded="false"]',
       'button[aria-label*="Show" i]',
     ]);
   },
   
-  extract(doc) {
+  async extract(doc) {
     const messages: Message[] = [];
     const turns = doc.querySelectorAll("[data-message-author-role]");
     

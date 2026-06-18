@@ -96,6 +96,14 @@
       "matches": [
         "<all_urls>"
       ]
+    },
+    {
+      "resources": [
+        "public/hook-credentials.js"
+      ],
+      "matches": [
+        "https://gemini.google.com/*"
+      ]
     }
   ],
   "incognito": "spanning"

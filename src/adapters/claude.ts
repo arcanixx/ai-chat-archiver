@@ -12,7 +12,7 @@
  * @exports claudeAdapter
  */
 
-import { expandUntilStable, nodeToParts, readTimestamp, type ProviderAdapter } from "./base";
+import { expandUntilStable, nodeToParts, readTimestamp, sleep, type ProviderAdapter } from "./base";
 import { logger } from "../core/logger";
 import { extractAttachmentsFromDocument } from "../core/attachments";
 import type { Attachment, Message, Part } from "../core/types";
@@ -80,6 +80,158 @@ function getLanguageFromMime(mime: string): string {
     "text/x-go": "go",
   };
   return map[mime] || mime.split("/").pop() || "text";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API enrichment helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Extract conversation UUID from Claude chat URL */
+function extractConvIdFromUrl(url: string): string | null {
+  const m = url.match(/\/chat\/([a-f0-9-]{36})/);
+  return m?.[1] || null;
+}
+
+/** Cache for attachments extracted from API (used by extractAttachments) */
+let _cachedApiAttachments: Attachment[] | null = null;
+
+/**
+ * Extract non-text Parts (tool_use, tool_result, artifact, image, attachment)
+ * from a Claude API conversation detail response.
+ * Skips plain text blocks — we keep DOM text for better formatting.
+ */
+function extractApiNonTextParts(data: any): {
+  parts: Part[];
+  attachments: Attachment[];
+} {
+  const parts: Part[] = [];
+  const attachments: Attachment[] = [];
+  const artifactMemory: Record<string, { current: string; title: string; type: string; version: number }> = {};
+
+  const chatMessages = data.chat_messages || [];
+  for (const msg of chatMessages) {
+    for (const content of msg.content || []) {
+      if (!content) continue;
+
+      // Tool result
+      if (content.type === "tool_result") {
+        const result = typeof content.content === "string"
+          ? content.content
+          : content.content?.[0]?.text || content.text || "";
+        if (result) {
+          parts.push({ type: "tool_result", name: "tool_result", output: result });
+        }
+        continue;
+      }
+
+      // Tool use (including artifacts)
+      if (content.type === "tool_use") {
+        const toolName = content.name || "";
+        const input = content.input || {};
+
+        if (toolName === "artifacts") {
+          const artifactId = input.id || content.id || input.version_uuid || `artifact-${attachments.length + 1}`;
+          const command = (input.command || "create") as "create" | "rewrite" | "update";
+          const mimeType = input.type || input.textdoc_type || "text/plain";
+          const title = input.title || artifactId;
+
+          let contentStr = "";
+          const prev = artifactMemory[artifactId]?.current || "";
+
+          if (command === "create" || command === "rewrite") {
+            contentStr = typeof input.content === "string"
+              ? input.content
+              : JSON.stringify(input.content || input, null, 2);
+          } else if (command === "update") {
+            const oldStr = input.old_str || "";
+            const newStr = input.new_str || (typeof input.content === "string" ? input.content : "");
+            contentStr = prev.includes(oldStr) ? prev.replace(oldStr, newStr) : `${prev}\n\n/* patch */\n${newStr}`;
+          } else {
+            contentStr = typeof input.content === "string"
+              ? input.content
+              : JSON.stringify(input.content || input, null, 2);
+          }
+
+          const version = (artifactMemory[artifactId]?.version || 0) + 1;
+          artifactMemory[artifactId] = { current: contentStr, title, type: mimeType, version };
+
+          parts.push({
+            type: "artifact",
+            title: `${title} (v${version})`,
+            lang: getLanguageFromMime(mimeType),
+            code: contentStr,
+          });
+          continue;
+        }
+
+        // Other tool calls
+        parts.push({ type: "tool_use", name: toolName, input });
+        continue;
+      }
+
+      // User-uploaded document
+      if (content.type === "document" || (content.type === "text" && content.source?.type === "file")) {
+        const source = content.source || {};
+        const fileName = content.name || source.filename || source.file_name || `attachment-${attachments.length + 1}`;
+        const mimeType = source.media_type || content.media_type || "application/octet-stream";
+
+        const extractedText = content.extracted_content || content.text || (typeof source.data === "string" ? source.data : null);
+
+        parts.push({ type: "attachment", name: fileName, mime: mimeType });
+
+        if (extractedText) {
+          attachments.push({
+            name: fileName,
+            url: `data:${mimeType};base64,${btoa(unescape(encodeURIComponent(extractedText)))}`,
+            mime: mimeType,
+            data: extractedText,
+          });
+        } else if (source.url) {
+          attachments.push({ name: fileName, url: source.url, mime: mimeType });
+        }
+        continue;
+      }
+
+      // Image
+      if (content.type === "image") {
+        const src = content.source?.url ||
+          (content.source?.type === "base64"
+            ? `data:${content.source.media_type};base64,${content.source.data}`
+            : null);
+        if (src) {
+          parts.push({ type: "image", src, alt: content.alt || "" });
+        }
+        continue;
+      }
+    }
+  }
+
+  // Final artifact versions as attachments
+  for (const [, artifact] of Object.entries(artifactMemory)) {
+    const ext = getExtensionFromMime(artifact.type);
+    const alreadySaved = attachments.some((a) => a.name.includes(artifact.title));
+    if (!alreadySaved) {
+      attachments.push({
+        name: `${artifact.title}_final.${ext}`,
+        url: `data:${artifact.type};base64,${btoa(unescape(encodeURIComponent(artifact.current)))}`,
+        mime: artifact.type,
+        data: artifact.current,
+      });
+    }
+  }
+
+  return { parts, attachments };
+}
+
+/** Standalone Claude API fetch — used by both bulk fetchDetail and extract enrichment */
+async function fetchClaudeDetail(orgId: string, conversationId: string): Promise<any> {
+  const url = `https://claude.ai/api/organizations/${orgId}/chat_conversations/${conversationId}?tree=True&rendering_mode=messages&render_all_tools=true`;
+  const response = await fetch(url, {
+    credentials: "include",
+    headers: { accept: "*/*" },
+  });
+  if (!response.ok) throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
+  return await response.json();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -212,7 +364,7 @@ export const claudeAdapter: ProviderAdapter = {
     return doc.title.replace(/\s*[-–|]\s*Claude.*$/i, "").trim() || "Untitled conversation";
   },
 
-  async expandAll(doc) {
+  async expandAll(doc, _signal?: AbortSignal) {
     logger.debug("[ClaudeAdapter] expandAll start");
 
     // Pass 1 — expand thinking, reasoning, show more by aria-label (safe, targeted)
@@ -258,7 +410,7 @@ export const claudeAdapter: ProviderAdapter = {
     logger.debug("[ClaudeAdapter] expandAll done");
   },
 
-  extract(doc) {
+  async extract(doc) {
     logger.debug("[ClaudeAdapter] extract start");
     const messages: Message[] = [];
 
@@ -284,23 +436,60 @@ export const claudeAdapter: ProviderAdapter = {
         }
       }
 
-      // Append DOM artifacts to the last assistant message (or add a synthetic one)
-      const domArtifacts = extractDomArtifacts(doc);
-      if (domArtifacts.length > 0) {
-        const lastAssistantIdx = messages.findLastIndex((m) => m.role === "assistant");
-        if (lastAssistantIdx >= 0) {
-          messages[lastAssistantIdx].parts.push(...domArtifacts);
-        } else {
-          messages.push({ role: "assistant", parts: domArtifacts });
+      // ── API enrichment: fetch full conversation detail for artifacts/tools ──
+      let apiEnriched = false;
+      try {
+        const url = doc.location?.href || "";
+        const orgId = getOrgIdFromPage(doc);
+        const convId = extractConvIdFromUrl(url);
+        const isShare = this.isFullyExpandedView?.(new URL(url));
+
+        if (orgId && convId && !isShare) {
+          logger.info("[ClaudeAdapter] fetching API detail for enrichment", { convId });
+          const detail = await fetchClaudeDetail(orgId, convId);
+          const { parts: apiParts, attachments: apiAttachments } = extractApiNonTextParts(detail);
+
+          if (apiParts.length > 0) {
+            const lastAssistant = messages.findLastIndex((m) => m.role === "assistant");
+            if (lastAssistant >= 0) {
+              messages[lastAssistant].parts.push(...apiParts);
+            } else {
+              messages.push({ role: "assistant", parts: apiParts });
+            }
+            apiEnriched = true;
+            logger.info("[ClaudeAdapter] API enrichment appended", {
+              apiParts: apiParts.length,
+              apiAttachments: apiAttachments.length,
+            });
+          }
+
+          if (apiAttachments.length > 0) {
+            _cachedApiAttachments = apiAttachments;
+          }
         }
-        logger.info("[ClaudeAdapter] appended DOM artifacts", { count: domArtifacts.length });
+      } catch (e: any) {
+        logger.warn("[ClaudeAdapter] API enrichment failed, using DOM-only", { error: e.message });
+      }
+
+      // ── DOM artifact fallback (only if API enrichment didn't provide artifacts) ──
+      if (!apiEnriched) {
+        const domArtifacts = extractDomArtifacts(doc);
+        if (domArtifacts.length > 0) {
+          const lastAssistantIdx = messages.findLastIndex((m) => m.role === "assistant");
+          if (lastAssistantIdx >= 0) {
+            messages[lastAssistantIdx].parts.push(...domArtifacts);
+          } else {
+            messages.push({ role: "assistant", parts: domArtifacts });
+          }
+          logger.info("[ClaudeAdapter] appended DOM artifacts", { count: domArtifacts.length });
+        }
       }
 
       logger.info("[ClaudeAdapter] extract done", {
         total: messages.length,
         user: messages.filter((m) => m.role === "user").length,
         assistant: messages.filter((m) => m.role === "assistant").length,
-        artifacts: domArtifacts.length,
+        apiEnriched,
       });
 
       return messages;
@@ -347,18 +536,7 @@ export const claudeAdapter: ProviderAdapter = {
   async fetchDetail(authContext: string, conversationId: string) {
     const orgId = authContext;
     if (!orgId) throw new Error("Organization ID required for Claude bulk");
-
-    const url = `https://claude.ai/api/organizations/${orgId}/chat_conversations/${conversationId}?tree=True&rendering_mode=messages&render_all_tools=true`;
-    const response = await fetch(url, {
-      credentials: "include",
-      headers: { accept: "*/*" },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
-    }
-
-    return await response.json();
+    return fetchClaudeDetail(orgId, conversationId);
   },
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -593,6 +771,19 @@ export const claudeAdapter: ProviderAdapter = {
   },
 
   extractAttachments(doc) {
-    return extractAttachmentsFromDocument(doc);
+    const domAttachments = extractAttachmentsFromDocument(doc);
+    if (_cachedApiAttachments && _cachedApiAttachments.length > 0) {
+      const merged = [...domAttachments];
+      const seen = new Set(merged.map((a) => a.url));
+      for (const att of _cachedApiAttachments) {
+        if (!seen.has(att.url)) {
+          seen.add(att.url);
+          merged.push(att);
+        }
+      }
+      _cachedApiAttachments = null;
+      return merged;
+    }
+    return domAttachments;
   },
 };

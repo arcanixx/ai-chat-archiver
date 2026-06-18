@@ -45,6 +45,59 @@ export function toast(text: string, kind: "ok" | "err" = "ok") {
   }, 6000);
 }
 
+let _overlayCleanup: (() => void) | null = null;
+
+/**
+ * Show a full-page gray overlay with spinner and cancel button.
+ * Returns an AbortSignal — pass to expandAll() to cancel on user click.
+ */
+export function showOverlay(): AbortSignal {
+  const controller = new AbortController();
+
+  const overlay = document.createElement("div");
+  overlay.id = "ai-archiver-overlay";
+  overlay.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:40px;border-radius:16px;">
+      <div class="spinner" style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:ai-archiver-spin 0.8s linear infinite;"></div>
+      <div style="color:#fff;font-size:18px;font-weight:500;">Processing conversation...</div>
+      <button id="ai-archiver-cancel-btn" style="margin-top:8px;padding:8px 24px;border:2px solid rgba(255,255,255,0.4);border-radius:8px;background:transparent;color:#fff;font-size:14px;cursor:pointer;">✕ Cancel</button>
+    </div>
+  `;
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;" +
+    "background:rgba(0,0,0,0.55);backdrop-filter:blur(3px);";
+
+  // Spinner animation
+  const style = document.createElement("style");
+  style.textContent = `@keyframes ai-archiver-spin { to { transform: rotate(360deg); } }`;
+  document.head.appendChild(style);
+
+  document.body.appendChild(overlay);
+
+  const cancelBtn = overlay.querySelector("#ai-archiver-cancel-btn") as HTMLElement;
+  const onCancel = () => {
+    controller.abort();
+    cleanup();
+  };
+  cancelBtn.addEventListener("click", onCancel);
+
+  const cleanup = () => {
+    overlay.remove();
+    style.remove();
+    _overlayCleanup = null;
+  };
+  _overlayCleanup = cleanup;
+
+  return controller.signal;
+}
+
+export function hideOverlay() {
+  if (_overlayCleanup) {
+    _overlayCleanup();
+    _overlayCleanup = null;
+  }
+}
+
 export async function injectFloatingButton(onSave: () => void, onSaveSelection: () => void) {
   const FLOAT_BTN_ID = "ai-archiver-float-btn";
   if (document.getElementById(FLOAT_BTN_ID)) return;

@@ -151,7 +151,7 @@ export const kimiAdapter: ProviderAdapter = {
     return fromName || "Untitled conversation";
   },
   
-  async expandAll(doc) {
+  async expandAll(doc, _signal?: AbortSignal) {
     await expandUntilStable(doc, [
       'button[aria-expanded="false"]',
       'div[class*="thinking"] button',

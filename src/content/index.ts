@@ -1,6 +1,7 @@
 import { adapterFor } from "../adapters";
 import { extractDomConversationList, nodeToParts } from "../adapters/base";
-import { toast, injectFloatingButton } from "./ui";
+import { toast, injectFloatingButton, showOverlay, hideOverlay } from "./ui";
+import { setGeminiHookCredentials } from "../adapters/gemini";
 import { repairFences } from "../core/fence";
 import { logger } from "../core/logger";
 import { appendAttachmentNotes, extractAttachmentsFromDocument, mergeAttachments } from "../core/attachments";
@@ -33,7 +34,7 @@ function detectAttachments(doc: Document, adapter?: { extractAttachments?: (doc:
   );
 }
 
-async function buildConversation(): Promise<Conversation> {
+async function buildConversation(signal?: AbortSignal): Promise<Conversation> {
   const startTime = Date.now();
   const adapter = adapterFor(location.href);
   if (!adapter) {
@@ -42,6 +43,8 @@ async function buildConversation(): Promise<Conversation> {
   }
 
   logger.debug("Starting conversation build", { provider: adapter.id, url: location.href });
+
+  signal?.throwIfAborted();
 
   const conv: Conversation = {
     schemaVersion: 1,
@@ -87,15 +90,19 @@ async function buildConversation(): Promise<Conversation> {
   const skipExpand = adapter.isFullyExpandedView?.(new URL(location.href)) ?? false;
   if (!skipExpand) {
     try {
-      await adapter.expandAll(document);
+      signal?.throwIfAborted();
+      await adapter.expandAll(document, signal);
+      signal?.throwIfAborted();
       logger.debug("Expanded all sections");
     } catch (e: any) {
+      if (e.name === "AbortError") throw e;
       logger.error("expandAll failed", { error: e.message });
       conv.warnings.push(`expandAll failed: ${e.message}`);
     }
   }
 
   try {
+    signal?.throwIfAborted();
     conv.messages = await adapter.extract(document);
     logger.debug("Extracted messages", { count: conv.messages.length });
   } catch (e: any) {
@@ -381,8 +388,10 @@ async function handleSaveConversation() {
   const startTime = Date.now();
   logger.debug("Starting save conversation", { url: location.href });
 
+  const signal = showOverlay();
+
   try {
-    const conversation = await buildConversation();
+    const conversation = await buildConversation(signal);
     logger.info("Conversation built successfully", { 
       provider: conversation.provider,
       messageCount: conversation.messages.length,
@@ -448,6 +457,11 @@ async function handleSaveConversation() {
       throw new Error(`Failed to save: ${e.message}`);
     }
   } catch (err: any) {
+    if (err.name === "AbortError") {
+      logger.info("Save cancelled by user");
+      toast("Cancelled");
+      return;
+    }
     logger.error("Save conversation failed", { 
       url: location.href,
       error: err.message,
@@ -455,6 +469,7 @@ async function handleSaveConversation() {
     });
     toast(`Error: ${err.message}`, "err");
   } finally {
+    hideOverlay();
     saveInProgress = false;
   }
 }
@@ -608,9 +623,45 @@ async function initFloatingButton() {
   setTimeout(() => maybeInject().catch(() => {}), 2000);
 }
 
+// ─── Gemini auth hook injection ──────────────────────────────────────────
+function injectGeminiHook() {
+  if (!location.hostname.includes("gemini.google.com")) return;
+  if (document.querySelector('script[src*="hook-credentials"]')) return;
+
+  const script = document.createElement("script");
+  script.src = chrome.runtime.getURL("public/hook-credentials.js");
+  script.onload = () => {
+    logger.debug("[GeminiHook] hook-credentials.js injected into page context");
+    script.remove();
+  };
+  script.onerror = (e) => {
+    logger.error("[GeminiHook] Failed to inject hook-credentials.js", e);
+  };
+  (document.head || document.documentElement).appendChild(script);
+}
+
+// Listen for credential messages from the hook script
+window.addEventListener("message", (event) => {
+  if (event.data?.type !== "GEMINI_CREDENTIALS") return;
+  const { at, sid, url, timestamp } = event.data.payload;
+  logger.debug("[GeminiHook] Credentials captured", { hasAt: !!at, hasSid: !!sid, timestamp });
+
+  if (sid) {
+    const creds = { sid, at: at || "" };
+    // Update module-level cache in gemini adapter
+    setGeminiHookCredentials(creds);
+    // Also persist to storage as fallback
+    chrome.storage.local.set({
+      gemini_credentials: { ...creds, updatedAt: timestamp || Date.now() },
+    }).catch(() => {});
+  }
+});
+
 try {
   logger.debug("Initial injection attempt");
   initFloatingButton();
+  // Inject Gemini hook on Gemini pages
+  injectGeminiHook();
 } catch (e: any) {
   logger.error("Failed to start floating button injection", { error: e.message });
 }

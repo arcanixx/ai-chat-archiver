@@ -29,8 +29,8 @@ export interface ProviderAdapter extends Partial<BulkAdapter> {
   isFullyExpandedView?(url: URL): boolean;
   getTitle(doc: Document): string;
   detectModel?(doc: Document): string | undefined;
-  expandAll(doc: Document): Promise<void>;
-  extract(doc: Document): Message[] | Promise<Message[]>;
+  expandAll(doc: Document, signal?: AbortSignal): Promise<void>;
+  extract(doc: Document): Promise<Message[]>;
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

@@ -51,9 +51,9 @@ describe('Claude Adapter', () => {
   });
 
   describe('extract', () => {
-    it('should return empty array for empty document', () => {
+    it('should return empty array for empty document', async () => {
       const doc = { querySelectorAll: () => [], title: '', querySelector: () => null, location: { href: '' } } as any;
-      const result = claudeAdapter.extract(doc) as any[];
+      const result = await claudeAdapter.extract(doc) as any[];
       expect(Array.isArray(result)).toBe(true);
       expect(result).toHaveLength(0);
     });
